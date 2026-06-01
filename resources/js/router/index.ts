@@ -48,6 +48,11 @@ const router = createRouter({
                     component: () => import('@/pages/Copilot/CopilotChat.vue'),
                 },
                 {
+                    path: 'reports',
+                    name: 'reports',
+                    component: () => import('@/pages/Reports/ReportsDashboard.vue'),
+                },
+                {
                     path: 'imports',
                     name: 'imports',
                     component: () => import('@/pages/Imports/ImportList.vue'),
