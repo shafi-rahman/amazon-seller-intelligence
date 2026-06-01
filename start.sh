@@ -55,9 +55,26 @@ info "Generating application key..."
 docker compose exec -T app php artisan key:generate --no-interaction --force
 
 info "Publishing vendor config..."
-docker compose exec -T app php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider" --no-interaction --force
-docker compose exec -T app php artisan vendor:publish --provider="Laravel\Horizon\HorizonServiceProvider" --no-interaction --force
-docker compose exec -T app php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider" --no-interaction --force
+# --skip-existing prevents re-publishing Sanctum/Spatie migrations when they already exist
+docker compose exec -T app php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider" --no-interaction --tag="sanctum-config"
+docker compose exec -T app php artisan vendor:publish --provider="Laravel\Horizon\HorizonServiceProvider" --no-interaction --tag="horizon-assets" --tag="horizon-config"
+docker compose exec -T app php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider" --no-interaction --tag="permission-config"
+
+# Publish migrations only if they don't already exist
+docker compose exec -T app php artisan vendor:publish \
+    --provider="Laravel\Sanctum\SanctumServiceProvider" --tag="sanctum-migrations" \
+    --no-interaction 2>/dev/null || true
+docker compose exec -T app php artisan vendor:publish \
+    --provider="Spatie\Permission\PermissionServiceProvider" --tag="permission-migrations" \
+    --no-interaction 2>/dev/null || true
+
+# Remove any duplicate Sanctum migration (vendor:publish creates a new one each run)
+info "Removing duplicate Sanctum migration if present..."
+SANCTUM_DUPS=$(ls database/migrations/*create_personal_access_tokens_table.php 2>/dev/null | sort | tail -n +2)
+if [ -n "$SANCTUM_DUPS" ]; then
+    echo "$SANCTUM_DUPS" | xargs rm -f
+    warn "Removed duplicate Sanctum migration(s): $SANCTUM_DUPS"
+fi
 
 info "Running database migrations..."
 docker compose exec -T app php artisan migrate --no-interaction --force
