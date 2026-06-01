@@ -62,6 +62,22 @@ const router = createRouter({
                     name: 'imports.progress',
                     component: () => import('@/pages/Imports/ImportProgress.vue'),
                 },
+                // Reconciliation
+                {
+                    path: 'reconciliation',
+                    name: 'reconciliation',
+                    component: () => import('@/pages/Reconciliation/ReconciliationHistory.vue'),
+                },
+                {
+                    path: 'reconciliation/run',
+                    name: 'reconciliation.run',
+                    component: () => import('@/pages/Reconciliation/ReconciliationWizard.vue'),
+                },
+                {
+                    path: 'reconciliation/:id',
+                    name: 'reconciliation.detail',
+                    component: () => import('@/pages/Reconciliation/ReconciliationRunDetail.vue'),
+                },
                 // Finance
                 {
                     path: 'finance',

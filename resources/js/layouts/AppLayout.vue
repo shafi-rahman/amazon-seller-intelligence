@@ -62,6 +62,14 @@ async function handleLogout() {
                     Imports
                 </RouterLink>
 
+                <!-- Reconciliation -->
+                <div class="mt-3 pt-3 border-t border-gray-100">
+                    <RouterLink to="/reconciliation" class="flex items-center gap-2 px-3 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-100 transition-colors" active-class="bg-indigo-50 text-indigo-700 font-medium">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                        Reconciliation
+                    </RouterLink>
+                </div>
+
                 <!-- Finance section -->
                 <div class="mt-3 pt-3 border-t border-gray-100">
                     <p class="px-3 mb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Finance</p>
