@@ -51,6 +51,17 @@ async function handleLogout() {
                 </RouterLink>
 
                 <RouterLink
+                    to="/copilot"
+                    class="flex items-center gap-2 px-3 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-100 transition-colors"
+                    active-class="bg-indigo-50 text-indigo-700 font-medium"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    </svg>
+                    AI Copilot
+                </RouterLink>
+
+                <RouterLink
                     to="/imports"
                     class="flex items-center gap-2 px-3 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-100 transition-colors"
                     active-class="bg-indigo-50 text-indigo-700 font-medium"

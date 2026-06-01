@@ -43,6 +43,11 @@ const router = createRouter({
                     component: () => import('@/pages/Dashboard.vue'),
                 },
                 {
+                    path: 'copilot',
+                    name: 'copilot',
+                    component: () => import('@/pages/Copilot/CopilotChat.vue'),
+                },
+                {
                     path: 'imports',
                     name: 'imports',
                     component: () => import('@/pages/Imports/ImportList.vue'),
