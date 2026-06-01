@@ -214,16 +214,36 @@ return [
 
     'environments' => [
         'production' => [
-            'supervisor-1' => [
-                'maxProcesses' => 10,
-                'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
+            'supervisor-imports' => [
+                'connection'       => 'redis',
+                'queue'            => ['imports'],
+                'maxProcesses'     => 3,
+                'memory'           => 512,
+                'timeout'          => 600,
+                'balanceMaxShift'  => 1,
+                'balanceCooldown'  => 3,
+            ],
+            'supervisor-default' => [
+                'connection'       => 'redis',
+                'queue'            => ['default', 'reconciliation', 'ai', 'reports', 'embeddings'],
+                'maxProcesses'     => 5,
+                'balanceMaxShift'  => 1,
+                'balanceCooldown'  => 3,
             ],
         ],
 
         'local' => [
-            'supervisor-1' => [
-                'maxProcesses' => 3,
+            'supervisor-imports' => [
+                'connection'   => 'redis',
+                'queue'        => ['imports'],
+                'maxProcesses' => 2,
+                'memory'       => 512,
+                'timeout'      => 600,
+            ],
+            'supervisor-default' => [
+                'connection'   => 'redis',
+                'queue'        => ['default', 'reconciliation', 'ai', 'reports', 'embeddings'],
+                'maxProcesses' => 2,
             ],
         ],
     ],

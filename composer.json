@@ -10,11 +10,11 @@
         "laravel/horizon": "^5.31",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
-        "league/csv": "^9.22",
+        "league/csv": "^9.28",
         "league/flysystem-aws-s3-v3": "^3.0",
         "spatie/laravel-permission": "^6.0",
-        "symfony/css-selector": "^7.0",
-        "symfony/dom-crawler": "^7.0"
+        "symfony/css-selector": "^8.1",
+        "symfony/dom-crawler": "^8.1"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
