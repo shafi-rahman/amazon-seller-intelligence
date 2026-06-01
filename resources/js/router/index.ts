@@ -78,6 +78,17 @@ const router = createRouter({
                     name: 'reconciliation.detail',
                     component: () => import('@/pages/Reconciliation/ReconciliationRunDetail.vue'),
                 },
+                // Products
+                {
+                    path: 'products',
+                    name: 'products',
+                    component: () => import('@/pages/Products/ProductsList.vue'),
+                },
+                {
+                    path: 'products/:id',
+                    name: 'products.detail',
+                    component: () => import('@/pages/Products/ProductDetail.vue'),
+                },
                 // Finance
                 {
                     path: 'finance',
