@@ -6,6 +6,7 @@ use App\Modules\Finance\Models\BankTransaction;
 use App\Modules\Finance\Models\GstTransaction;
 use App\Modules\Finance\Models\Order;
 use App\Modules\Finance\Models\Settlement;
+use App\Modules\Reconciliation\Events\ReconciliationCompleted;
 use App\Modules\Reconciliation\Models\ReconciliationMatch;
 use App\Modules\Reconciliation\Models\ReconciliationReport;
 use App\Modules\Reconciliation\Models\ReconciliationRun;
@@ -34,6 +35,7 @@ class ReconciliationEngine
             $this->generateAllReports($run);
 
             $run->update(['status' => 'completed', 'completed_at' => now()]);
+            ReconciliationCompleted::dispatch($run->fresh());
         } catch (\Throwable $e) {
             $run->update([
                 'status'       => 'failed',

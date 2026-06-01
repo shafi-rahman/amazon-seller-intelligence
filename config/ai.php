@@ -21,8 +21,10 @@ return [
 
         'groq' => [
             'api_key' => env('GROQ_API_KEY'),
-            'model'   => 'llama-3.1-8b-instant',
+            'model'   => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
             'api_url' => 'https://api.groq.com/openai/v1',
+            // Groq uses OpenAI-compatible API format
+            // Note: Groq does NOT offer embedding models — use openai or ollama for embeddings
         ],
 
         'gemini' => [
@@ -37,8 +39,9 @@ return [
 
     ],
 
-    // Primary provider for reasoning tasks
-    'default_provider' => 'anthropic',
+    // Primary provider for reasoning tasks (AI Copilot, listing analysis, rewrite)
+    // groq = fast & cheap LLM via llama-3.3-70b | anthropic = Claude (higher quality)
+    'default_provider' => env('AI_DEFAULT_PROVIDER', 'groq'),
 
     // Provider used for embeddings
     'embedding_provider' => env('APP_ENV') === 'local' && empty(env('OPENAI_API_KEY'))

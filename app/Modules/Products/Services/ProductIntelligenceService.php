@@ -2,6 +2,7 @@
 
 namespace App\Modules\Products\Services;
 
+use App\Modules\AI\Jobs\EmbedDocumentJob;
 use App\Modules\Products\Models\Product;
 use App\Modules\Products\Models\ProductAnalysis;
 use App\Modules\Products\Models\ProductKeyword;
@@ -128,6 +129,12 @@ class ProductIntelligenceService
         $product->update($updates);
 
         // Re-analyze with the updated content
-        return $this->analyze($product->fresh());
+        $analyzed = $this->analyze($product->fresh());
+
+        // Re-embed the updated listing (async)
+        EmbedDocumentJob::dispatch(Product::class, $analyzed->id, $analyzed->workspace_id)
+            ->onQueue('embeddings');
+
+        return $analyzed;
     }
 }
