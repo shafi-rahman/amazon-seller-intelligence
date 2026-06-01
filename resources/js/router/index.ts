@@ -62,6 +62,32 @@ const router = createRouter({
                     name: 'imports.progress',
                     component: () => import('@/pages/Imports/ImportProgress.vue'),
                 },
+                // Finance
+                {
+                    path: 'finance',
+                    name: 'finance.dashboard',
+                    component: () => import('@/pages/Finance/FinanceDashboard.vue'),
+                },
+                {
+                    path: 'finance/orders',
+                    name: 'finance.orders',
+                    component: () => import('@/pages/Finance/OrdersList.vue'),
+                },
+                {
+                    path: 'finance/settlements',
+                    name: 'finance.settlements',
+                    component: () => import('@/pages/Finance/SettlementsList.vue'),
+                },
+                {
+                    path: 'finance/bank',
+                    name: 'finance.bank',
+                    component: () => import('@/pages/Finance/BankTransactionsList.vue'),
+                },
+                {
+                    path: 'finance/gst',
+                    name: 'finance.gst',
+                    component: () => import('@/pages/Finance/GstTransactionsList.vue'),
+                },
             ],
         },
         {
