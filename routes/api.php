@@ -6,3 +6,4 @@ use Illuminate\Support\Facades\Route;
 require __DIR__.'/../app/Modules/Identity/Routes/api.php';
 require __DIR__.'/../app/Modules/Workspace/Routes/api.php';
 require __DIR__.'/../app/Modules/Imports/Routes/api.php';
+require __DIR__.'/../app/Modules/Finance/Routes/api.php';
