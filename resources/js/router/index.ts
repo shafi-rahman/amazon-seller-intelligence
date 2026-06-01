@@ -89,6 +89,22 @@ const router = createRouter({
                     name: 'products.detail',
                     component: () => import('@/pages/Products/ProductDetail.vue'),
                 },
+                // Competitor pages
+                {
+                    path: 'products/:productId/competitors',
+                    name: 'competitors',
+                    component: () => import('@/pages/Competitors/CompetitorsList.vue'),
+                },
+                {
+                    path: 'products/:productId/keyword-gaps',
+                    name: 'keyword-gaps',
+                    component: () => import('@/pages/Competitors/KeywordGaps.vue'),
+                },
+                {
+                    path: 'products/:productId/benchmark',
+                    name: 'benchmark',
+                    component: () => import('@/pages/Competitors/BenchmarkView.vue'),
+                },
                 // Finance
                 {
                     path: 'finance',
