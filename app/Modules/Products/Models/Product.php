@@ -42,4 +42,41 @@ class Product extends Model
     {
         return $this->hasMany(\App\Modules\Competitors\Models\Competitor::class);
     }
+
+    public function keywords(): HasMany
+    {
+        return $this->hasMany(ProductKeyword::class);
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(ProductReview::class);
+    }
+
+    public function analyses(): HasMany
+    {
+        return $this->hasMany(ProductAnalysis::class);
+    }
+
+    public function latestAnalysis(string $type): ?ProductAnalysis
+    {
+        return $this->analyses()->where('analysis_type', $type)->latest('created_at')->first();
+    }
+
+    public function bullets(): array
+    {
+        return array_filter([
+            $this->bullet_1, $this->bullet_2, $this->bullet_3,
+            $this->bullet_4, $this->bullet_5,
+        ]);
+    }
+
+    public function combinedText(): string
+    {
+        return implode(' ', array_filter([
+            $this->title,
+            implode(' ', $this->bullets()),
+            $this->description,
+        ]));
+    }
 }

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Modules\Finance\Listeners\ExtractBankReferences;
 use App\Modules\Imports\Events\ImportCompleted;
+use App\Modules\Products\Listeners\AnalyzeImportedProducts;
 use App\Modules\Workspace\Models\Workspace;
 use App\Observers\AuditObserver;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -21,5 +22,6 @@ class AppServiceProvider extends ServiceProvider
         Workspace::observe(AuditObserver::class);
 
         Event::listen(ImportCompleted::class, ExtractBankReferences::class);
+        Event::listen(ImportCompleted::class, AnalyzeImportedProducts::class);
     }
 }
