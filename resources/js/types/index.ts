@@ -32,6 +32,33 @@ export interface ApiError {
     errors?: Record<string, string[]>
 }
 
+export interface ImportBatch {
+    id: number
+    type: string
+    original_filename: string
+    status: string
+    total_rows: number
+    processed_rows: number
+    failed_rows: number
+    percent: number
+    started_at: string | null
+    completed_at: string | null
+    created_at: string
+}
+
+export interface ImportStatus {
+    id: number
+    type: string
+    status: string
+    total_rows: number
+    processed_rows: number
+    failed_rows: number
+    percent: number
+    started_at: string | null
+    completed_at: string | null
+    meta: Record<string, unknown>
+}
+
 export interface PaginatedResponse<T> {
     data: T[]
     meta: {

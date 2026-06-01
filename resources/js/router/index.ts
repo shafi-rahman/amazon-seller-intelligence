@@ -42,6 +42,26 @@ const router = createRouter({
                     name: 'dashboard',
                     component: () => import('@/pages/Dashboard.vue'),
                 },
+                {
+                    path: 'imports',
+                    name: 'imports',
+                    component: () => import('@/pages/Imports/ImportList.vue'),
+                },
+                {
+                    path: 'imports/upload',
+                    name: 'imports.upload',
+                    component: () => import('@/pages/Imports/ImportUpload.vue'),
+                },
+                {
+                    path: 'imports/html',
+                    name: 'imports.html',
+                    component: () => import('@/pages/Imports/ImportHtmlPaste.vue'),
+                },
+                {
+                    path: 'imports/:id/progress',
+                    name: 'imports.progress',
+                    component: () => import('@/pages/Imports/ImportProgress.vue'),
+                },
             ],
         },
         {
