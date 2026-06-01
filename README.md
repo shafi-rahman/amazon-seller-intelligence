@@ -1,8 +1,134 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# ASIP — Amazon Seller Intelligence Platform
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
+> AI-first platform answering three questions for Amazon sellers:
+> **"Where did my money go?"** · **"Why aren't my products selling?"** · **"What should I do next?"**
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/shafi-rahman/amazon-seller-intelligence.git
+cd amazon-seller-intelligence
+bash start.sh
+```
+
+App runs at **http://localhost** — default login: `seller@asip.local` / `password`
+
+| Service | URL |
+|---------|-----|
+| App | http://localhost |
+| Queue (Horizon) | http://localhost/horizon |
+| File Storage (MinIO) | http://localhost:9001 (asip / secret123) |
+| Email (MailHog) | http://localhost:8025 |
+| Debug (Telescope) | http://localhost/telescope |
+
+---
+
+## What It Does
+
+**Financial Reconciliation** — Import Orders, Settlements, Bank Statements, GST Reports. 4-pass matching engine identifies missing settlements, missing bank credits, refund/return impact, and GST mismatches. Exports as PDF or CSV.
+
+**Listing Intelligence** — 100-point listing score across 5 dimensions (Title, Bullets, Description, Reviews, Keywords). AI-powered optimization suggestions and full listing rewrites via Groq.
+
+**Competitor Intelligence** — Keyword gap analysis with priority scoring (missing/underused/advantage). Benchmark comparisons with score, price, rating, and review deltas.
+
+**AI Copilot** — Conversational AI backed by pgvector RAG search over your data. Context-aware prompts for financial, listing, and competitor queries. Powered by Groq llama-3.3-70b-versatile.
+
+---
+
+## Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Laravel 13 / PHP 8.4 (modular monolith) |
+| Frontend | Vue 3 + TypeScript + Tailwind CSS v4 + Pinia |
+| Database | PostgreSQL 16 + pgvector (HNSW embeddings) |
+| Queue | Redis 7 + Laravel Horizon |
+| Files | MinIO (S3-compatible) |
+| AI | Groq (primary) · Claude · OpenAI |
+| Dev tools | Laravel Telescope · MailHog |
+
+---
+
+## Data Entry — No API Required
+
+| Data | Format | Where to Get |
+|------|--------|-------------|
+| Orders | CSV | Seller Central → Reports → Order Reports |
+| Settlements | Tab-separated | Seller Central → Reports → Payments |
+| Bank Statement | CSV | Your bank's CSV export |
+| GST Report | CSV | Seller Central → Reports → Tax Document Library |
+| Products | CSV | Any spreadsheet with ASIN, title, bullets |
+| Competitors | HTML paste | Browser Ctrl+U → Select All → Paste |
+
+---
+
+## Environment Setup
+
+```dotenv
+# .env — copy from .env.example
+
+# AI (Groq is configured and primary)
+GROQ_API_KEY=your_key
+GROQ_MODEL=llama-3.3-70b-versatile
+AI_DEFAULT_PROVIDER=groq
+
+# Optional: Anthropic Claude (higher-quality fallback)
+ANTHROPIC_API_KEY=
+
+# Required for RAG embeddings
+OPENAI_API_KEY=
+
+# All database/Redis/MinIO settings are pre-configured for Docker
+```
+
+---
+
+## Architecture
+
+```
+app/Modules/
+├── Identity/        Auth + registration
+├── Workspace/       Multi-workspace, RBAC (5 roles, 18 permissions)
+├── Imports/         Universal CSV/HTML import engine (7 parsers)
+├── Finance/         Orders, Settlements, Bank, GST APIs
+├── Reconciliation/  4-pass matching engine, 6 report types
+├── Products/        Listing scoring, keyword extraction, AI rewrites
+├── Competitors/     Keyword gap analysis, competitive benchmarks
+├── AI/              pgvector RAG, embeddings, AI Copilot
+└── Reports/         PDF/CSV exports (8 report types)
+```
+
+All sprints complete (Sprints 1–10). See [`/docs`](./docs/) for full technical documentation.
+
+---
+
+## Development Commands
+
+```bash
+# Run tests
+docker compose exec app php artisan test
+
+# Fresh database
+docker compose exec app php artisan migrate:fresh --seed
+
+# Run a specific test
+docker compose exec app php artisan test --filter=ReconciliationEngineTest
+
+# Queue dashboard
+open http://localhost/horizon
+
+# Debug requests
+open http://localhost/telescope
+```
+
+---
+
+## Requirements
+
+- Docker Desktop · 4GB RAM minimum · 20GB disk
+- No PHP, Node, or Composer needed on the host machine
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
