@@ -1,0 +1,85 @@
+<script setup lang="ts">
+import { useAuthStore } from '@/stores/auth'
+import { useWorkspaceStore } from '@/stores/workspace'
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+
+const authStore = useAuthStore()
+const workspaceStore = useWorkspaceStore()
+const router = useRouter()
+
+onMounted(() => {
+    workspaceStore.fetchAll()
+})
+
+async function handleLogout() {
+    await authStore.logout()
+    router.push({ name: 'login' })
+}
+</script>
+
+<template>
+    <div class="min-h-screen bg-gray-100 flex">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white shadow-sm flex flex-col">
+            <div class="flex items-center gap-2 p-4 border-b">
+                <div class="w-7 h-7 bg-indigo-600 rounded flex items-center justify-center">
+                    <span class="text-white font-bold text-xs">A</span>
+                </div>
+                <span class="font-bold text-gray-900">ASIP</span>
+            </div>
+
+            <!-- Workspace selector -->
+            <div class="p-3 border-b">
+                <div class="text-xs text-gray-500 mb-1">Workspace</div>
+                <div class="text-sm font-medium text-gray-800 truncate">
+                    {{ workspaceStore.current?.name ?? 'Loading...' }}
+                </div>
+            </div>
+
+            <nav class="flex-1 p-3 space-y-1">
+                <RouterLink
+                    to="/dashboard"
+                    class="flex items-center gap-2 px-3 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-100 transition-colors"
+                    active-class="bg-indigo-50 text-indigo-700 font-medium"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    Dashboard
+                </RouterLink>
+            </nav>
+
+            <!-- User info -->
+            <div class="p-3 border-t">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                        <span class="text-indigo-700 font-medium text-sm">
+                            {{ authStore.user?.name?.charAt(0).toUpperCase() }}
+                        </span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-gray-900 truncate">{{ authStore.user?.name }}</div>
+                        <div class="text-xs text-gray-500 truncate">{{ authStore.user?.role }}</div>
+                    </div>
+                    <button
+                        @click="handleLogout"
+                        class="text-gray-400 hover:text-red-500 transition-colors"
+                        title="Logout"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <main class="flex-1 overflow-auto">
+            <RouterView />
+        </main>
+    </div>
+</template>
