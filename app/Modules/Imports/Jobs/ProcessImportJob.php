@@ -19,7 +19,12 @@ class ProcessImportJob implements ShouldQueue
     use Queueable;
 
     public int $timeout = 600;
-    public int $tries   = 2;
+    public int $tries   = 3;
+
+    public function backoff(): array
+    {
+        return [30, 60, 120]; // 30s, 1m, 2m between retries
+    }
 
     public function __construct(private readonly int $batchId) {}
 

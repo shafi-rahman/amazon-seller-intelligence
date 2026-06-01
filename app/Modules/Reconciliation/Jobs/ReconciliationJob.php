@@ -12,7 +12,12 @@ class ReconciliationJob implements ShouldQueue
     use Queueable;
 
     public int $timeout = 600;
-    public int $tries   = 1;
+    public int $tries   = 2;
+
+    public function backoff(): array
+    {
+        return [60, 120]; // 1m, 2m between retries
+    }
 
     public function __construct(private readonly int $runId) {}
 

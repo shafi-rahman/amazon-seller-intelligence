@@ -22,6 +22,11 @@ class EmbedDocumentJob implements ShouldQueue
     public int $timeout = 120;
     public int $tries   = 3;
 
+    public function backoff(): array
+    {
+        return [10, 30, 60]; // fast retries then back off (API rate limits)
+    }
+
     public function __construct(
         private readonly string $embeddableType,
         private readonly int    $embeddableId,

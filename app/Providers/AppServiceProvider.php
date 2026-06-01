@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Listeners\LogFailedJob;
 use App\Modules\AI\Listeners\EmbedOnImport;
+use Illuminate\Queue\Events\JobFailed;
 use App\Modules\AI\Listeners\EmbedOnReconciliation;
 use App\Modules\Competitors\Listeners\AnalyzeImportedCompetitors;
 use App\Modules\Finance\Listeners\ExtractBankReferences;
@@ -30,5 +32,8 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(ImportCompleted::class, AnalyzeImportedCompetitors::class);
         Event::listen(ImportCompleted::class, EmbedOnImport::class);
         Event::listen(ReconciliationCompleted::class, EmbedOnReconciliation::class);
+
+        // Log all failed queue jobs for debugging
+        Event::listen(JobFailed::class, LogFailedJob::class);
     }
 }
