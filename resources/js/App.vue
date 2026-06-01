@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import AppToast from '@/components/AppToast.vue'
 
 const authStore = useAuthStore()
 
@@ -11,4 +12,5 @@ onMounted(async () => {
 
 <template>
     <RouterView />
+    <AppToast />
 </template>

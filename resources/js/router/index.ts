@@ -143,9 +143,21 @@ const router = createRouter({
                 },
             ],
         },
+        // Error pages (accessible to all, no auth required)
+        {
+            path: '/403',
+            name: 'forbidden',
+            component: () => import('@/pages/errors/Forbidden.vue'),
+        },
+        {
+            path: '/500',
+            name: 'server-error',
+            component: () => import('@/pages/errors/ServerError.vue'),
+        },
         {
             path: '/:pathMatch(.*)*',
-            redirect: '/dashboard',
+            name: 'not-found',
+            component: () => import('@/pages/errors/NotFound.vue'),
         },
     ],
 })
