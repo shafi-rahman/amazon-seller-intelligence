@@ -17,7 +17,15 @@ api.interceptors.response.use(
         const status = error.response?.status
 
         if (status === 401) {
-            window.location.href = '/login'
+            // Don't hard-redirect on the session-check call (/auth/me).
+            // That runs on every page load and would cause an infinite redirect
+            // loop when the user is not logged in.
+            // The Vue Router guard handles the redirect for unauthenticated users.
+            // Only hard-redirect on 401 for other API calls (e.g. session expired mid-use).
+            const url = error.config?.url ?? ''
+            if (!url.includes('/auth/me')) {
+                window.location.href = '/login'
+            }
             return Promise.reject(error)
         }
 

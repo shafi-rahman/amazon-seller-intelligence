@@ -1,13 +1,7 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { useAuthStore } from '@/stores/auth'
 import AppToast from '@/components/AppToast.vue'
-
-const authStore = useAuthStore()
-
-onMounted(async () => {
-    await authStore.fetchUser()
-})
+// Session is restored by the router's beforeEach guard on first navigation.
+// Calling fetchUser() here would race with the guard and cause a redirect loop.
 </script>
 
 <template>

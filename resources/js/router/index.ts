@@ -162,8 +162,21 @@ const router = createRouter({
     ],
 })
 
+// Track whether we've already attempted to restore the session on first load.
+// Without this, every navigation would call fetchUser() again.
+let sessionRestored = false
+
 router.beforeEach(async (to) => {
     const authStore = useAuthStore()
+
+    // On first navigation (e.g. page load or hard refresh), try to restore
+    // the session from the existing cookie before the guard checks auth state.
+    // This prevents the infinite loop where:
+    //   fetchUser() → 401 → redirect /login → page reload → fetchUser() → ...
+    if (!sessionRestored) {
+        sessionRestored = true
+        await authStore.fetchUser()
+    }
 
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
         return { name: 'login' }
