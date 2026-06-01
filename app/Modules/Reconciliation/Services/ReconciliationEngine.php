@@ -336,53 +336,31 @@ class ReconciliationEngine
             ->pluck('settlement_id')
             ->toArray();
 
-        $unmatchedCycles = DB::select("
+        // Use a subquery to avoid aggregate function in WHERE clause (invalid SQL)
+        $allCycles = DB::select("
             SELECT
-                s.settlement_id AS cycle_id,
+                MIN(s.id)          AS min_id,
+                s.settlement_id    AS cycle_id,
                 s.deposit_date,
-                s.deposited_amount,
+                MAX(s.deposited_amount) AS deposited_amount,
                 s.currency
             FROM settlements s
             WHERE s.workspace_id = :workspace_id
               AND s.deposit_date BETWEEN :from_date AND :to_date
               AND s.deposited_amount IS NOT NULL
               AND s.deposited_amount > 0
-              AND MIN(s.id) NOT IN (:ids)
-            GROUP BY s.settlement_id, s.deposit_date, s.deposited_amount, s.currency
+            GROUP BY s.settlement_id, s.deposit_date, s.currency
         ", [
             'workspace_id' => $run->workspace_id,
             'from_date'    => $from,
             'to_date'      => $to,
-            'ids'          => implode(',', $matchedSettlementIds ?: [0]),
         ]);
 
-        // Fallback for empty matchedSettlementIds or complex IN clause
-        if (empty($unmatchedCycles)) {
-            $unmatchedCycles = DB::select("
-                SELECT DISTINCT
-                    s.settlement_id AS cycle_id,
-                    s.deposit_date,
-                    MAX(s.deposited_amount) as deposited_amount,
-                    s.currency
-                FROM settlements s
-                WHERE s.workspace_id = :workspace_id
-                  AND s.deposit_date BETWEEN :from_date AND :to_date
-                  AND s.deposited_amount IS NOT NULL
-                  AND s.deposited_amount > 0
-                GROUP BY s.settlement_id, s.deposit_date, s.currency
-            ", [
-                'workspace_id' => $run->workspace_id,
-                'from_date'    => $from,
-                'to_date'      => $to,
-            ]);
-
-            $unmatchedCycles = collect($unmatchedCycles)->filter(function ($c) use ($matchedSettlementIds, $run) {
-                $sid = Settlement::where('workspace_id', $run->workspace_id)
-                    ->where('settlement_id', $c->cycle_id)
-                    ->value('id');
-                return !in_array($sid, $matchedSettlementIds);
-            })->values();
-        }
+        // Filter out cycles whose representative row (MIN id) is already matched
+        $matchedSet      = array_flip($matchedSettlementIds);
+        $unmatchedCycles = collect($allCycles)->filter(
+            fn($c) => !isset($matchedSet[$c->min_id])
+        )->values();
 
         $rows = collect($unmatchedCycles)->map(fn($c) => [
             'settlement_id'    => $c->cycle_id,
@@ -456,7 +434,7 @@ class ReconciliationEngine
         $mismatches = DB::select("
             SELECT
                 o.amazon_order_id,
-                o.invoice_date::date AS order_date,
+                o.purchase_date::date AS order_date,
                 CAST(o.item_tax AS numeric(12,2)) AS order_tax,
                 COALESCE(g.gst_total, 0) AS reported_tax,
                 CAST(ABS(CAST(o.item_tax AS numeric) - COALESCE(g.gst_total, 0)) AS numeric(12,2)) AS mismatch_amount
