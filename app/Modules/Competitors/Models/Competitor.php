@@ -7,6 +7,8 @@ use App\Modules\Products\Models\Product;
 use App\Modules\Workspace\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Competitor extends Model
 {
@@ -40,5 +42,43 @@ class Competitor extends Model
     public function importBatch(): BelongsTo
     {
         return $this->belongsTo(ImportBatch::class);
+    }
+
+    public function keywords(): HasMany
+    {
+        return $this->hasMany(CompetitorKeyword::class);
+    }
+
+    public function keywordGaps(): HasMany
+    {
+        return $this->hasMany(KeywordGap::class);
+    }
+
+    public function benchmark(): HasOne
+    {
+        return $this->hasOne(CompetitorBenchmark::class);
+    }
+
+    public function bullets(): array
+    {
+        return array_filter([
+            $this->bullet_1, $this->bullet_2, $this->bullet_3,
+            $this->bullet_4, $this->bullet_5,
+        ]);
+    }
+
+    public function combinedText(): string
+    {
+        return implode(' ', array_filter([
+            $this->title,
+            implode(' ', $this->bullets()),
+            $this->description,
+        ]));
+    }
+
+    public function isLowConfidenceField(string $field): bool
+    {
+        $confidence = $this->parse_confidence ?? [];
+        return isset($confidence[$field]) && $confidence[$field] < 60;
     }
 }
