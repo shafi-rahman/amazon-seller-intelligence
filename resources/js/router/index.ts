@@ -52,6 +52,17 @@ const router = createRouter({
                     name: 'reports',
                     component: () => import('@/pages/Reports/ReportsDashboard.vue'),
                 },
+                // SEO Agent
+                {
+                    path: 'seo',
+                    name: 'seo',
+                    component: () => import('@/pages/SEO/SeoCampaigns.vue'),
+                },
+                {
+                    path: 'seo/campaigns/:id',
+                    name: 'seo.campaign',
+                    component: () => import('@/pages/SEO/SeoCampaignDetail.vue'),
+                },
                 {
                     path: 'imports',
                     name: 'imports',

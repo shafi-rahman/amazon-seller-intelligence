@@ -38,7 +38,7 @@ class AIRouter
             }
 
             try {
-                $result = $this->callProvider($provider, $messages, $maxTokens);
+                $result = $this->callProvider($provider, $messages, $maxTokens, $taskType);
                 $this->trackTokens($workspaceId, $provider, $result);
                 return $result;
             } catch (\Throwable $e) {
@@ -80,10 +80,10 @@ class AIRouter
 
     // ─── Provider Implementations ──────────────────────────────────────
 
-    private function callProvider(string $provider, array $messages, int $maxTokens): array
+    private function callProvider(string $provider, array $messages, int $maxTokens, string $taskType = 'general'): array
     {
         return match ($provider) {
-            'nvidia'    => $this->callNvidia($messages, $maxTokens),
+            'nvidia'    => $this->callNvidia($messages, $maxTokens, $taskType),
             'groq'      => $this->callOpenAICompatible(
                 config('ai.providers.groq.api_url').'/chat/completions',
                 config('ai.providers.groq.api_key'),
@@ -191,7 +191,7 @@ class AIRouter
         ];
     }
 
-    private function callNvidia(array $messages, int $maxTokens): array
+    private function callNvidia(array $messages, int $maxTokens, string $taskType = 'general'): array
     {
         $model   = config('ai.providers.nvidia.model', 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning');
         $apiKey  = config('ai.providers.nvidia.api_key');
@@ -206,10 +206,17 @@ class AIRouter
             'stream'      => false,
         ];
 
-        // Nemotron reasoning model extras
+        // Nemotron reasoning model extras.
+        // JSON/structured tasks need a SMALL reasoning budget (256-512) so the model
+        // has tokens left for its actual output. Deep analysis tasks use the full budget.
         if (config('ai.providers.nvidia.enable_thinking', true)) {
-            $payload['reasoning_budget']      = config('ai.providers.nvidia.reasoning_budget', 16384);
-            $payload['chat_template_kwargs']  = ['enable_thinking' => true];
+            $reasoningBudget = match ($taskType) {
+                'listing', 'seo', 'json' => 256,   // small: JSON output needs output tokens
+                'financial', 'competitor' => 2048,  // medium: moderate analysis
+                default                  => config('ai.providers.nvidia.reasoning_budget', 16384),
+            };
+            $payload['reasoning_budget']     = $reasoningBudget;
+            $payload['chat_template_kwargs'] = ['enable_thinking' => true];
         }
 
         $response = Http::withHeaders([
@@ -229,8 +236,18 @@ class AIRouter
         $data    = $response->json();
         $content = $data['choices'][0]['message']['content'] ?? '';
 
-        // Strip <think>...</think> block if present (internal reasoning, not user-facing)
-        $content = preg_replace('/<think>.*?<\/think>/s', '', $content);
+        // Nemotron reasoning model wraps its thinking in <think>...</think>.
+        // The final user-facing answer appears AFTER the closing </think> tag.
+        // If nothing appears after </think>, the model embedded the answer
+        // inside the block — extract it from there as fallback.
+        if (str_contains($content, '</think>')) {
+            $parts      = explode('</think>', $content, 2);
+            $afterThink = trim($parts[1] ?? '');
+            $content    = $afterThink !== '' ? $afterThink : trim($parts[0] ?? $content);
+            // Remove the opening <think> tag if we fell back to inside content
+            $content = preg_replace('/^<think>\s*/s', '', $content);
+        }
+
         $content = trim($content);
 
         return [

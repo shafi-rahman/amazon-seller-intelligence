@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useProductsStore } from '@/stores/products'
+import { useSeoStore } from '@/stores/seo'
+import { useToastStore } from '@/stores/toast'
 
 const route         = useRoute()
+const router        = useRouter()
 const workspaceStore = useWorkspaceStore()
 const productsStore  = useProductsStore()
+const seoStore       = useSeoStore()
+const toast          = useToastStore()
 
 const activeTab    = ref<'overview' | 'score' | 'optimization' | 'keywords'>('overview')
 const analyzing    = ref(false)
@@ -23,6 +28,18 @@ onMounted(async () => {
 const product = computed(() => productsStore.current)
 const score   = computed(() => product.value?.score_breakdown ?? null)
 const suggestions = computed(() => product.value?.ai_suggestions ?? null)
+
+async function doSeo() {
+    const wsId = workspaceStore.current?.id
+    if (!wsId || !product.value) return
+    try {
+        const campaign = await seoStore.tagProduct(wsId, product.value.id)
+        toast.success('SEO campaign started! NVIDIA is generating your posts…')
+        router.push(`/seo/campaigns/${campaign.id}`)
+    } catch {
+        toast.error('Failed to start SEO campaign')
+    }
+}
 
 async function runAnalysis() {
     const wsId = workspaceStore.current?.id
@@ -102,7 +119,13 @@ function barColor(score: number, max: number) {
                         <span v-if="product.category">{{ product.category }}</span>
                     </div>
                 </div>
-                <div class="ml-4 text-right flex-shrink-0">
+                <div class="ml-4 text-right flex-shrink-0 space-y-2">
+                    <!-- DO SEO button -->
+                    <button @click="doSeo" :disabled="seoStore.tagging"
+                        class="w-full flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-semibold rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 transition-all shadow-sm">
+                        <span>🎯</span>
+                        {{ seoStore.tagging ? 'Starting…' : 'DO SEO' }}
+                    </button>
                     <div v-if="product.listing_score !== null" class="mb-2">
                         <div class="text-4xl font-bold" :class="product.listing_score >= 70 ? 'text-green-600' : product.listing_score >= 50 ? 'text-yellow-600' : 'text-red-600'">
                             {{ product.listing_score }}

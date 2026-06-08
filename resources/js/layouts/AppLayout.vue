@@ -50,6 +50,16 @@ async function handleLogout() {
                     Dashboard
                 </RouterLink>
 
+                <!-- SEO Agent — prominent top-level link -->
+                <RouterLink
+                    to="/seo"
+                    class="flex items-center gap-2 px-3 py-2 text-sm rounded-md font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 transition-colors"
+                    active-class="bg-purple-100 text-purple-800"
+                >
+                    <span class="text-base">🎯</span>
+                    SEO Agent
+                </RouterLink>
+
                 <RouterLink
                     to="/copilot"
                     class="flex items-center gap-2 px-3 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-100 transition-colors"

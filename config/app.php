@@ -65,7 +65,10 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'UTC'),
+
+    // Secure token for OpenClaw skill ↔ ASIP webhook communication
+    'seo_webhook_token' => env('SEO_WEBHOOK_TOKEN'),
 
     /*
     |--------------------------------------------------------------------------

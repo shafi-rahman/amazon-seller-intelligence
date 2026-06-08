@@ -1,0 +1,14 @@
+{
+  "name": "asip-seo-agent",
+  "version": "1.0.0",
+  "description": "OpenClaw skill that monitors ASIP for new SEO campaigns and sends approval notifications",
+  "type": "module",
+  "main": "seo-agent.js",
+  "scripts": {
+    "start": "node seo-agent.js",
+    "poll": "node seo-agent.js --mode=poll"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.0"
+  }
+}
