@@ -34,7 +34,8 @@ class ImportController extends Controller
         );
 
         return $this->created([
-            'import_batch_id'        => $batch->id,
+            'import_batch_id'        => $batch->public_id, // UUID for URL routing
+
             'status'                 => $batch->status,
             'total_rows'             => $batch->total_rows,
             'detected_columns'       => $batch->meta['detected_columns'] ?? [],
@@ -58,7 +59,7 @@ class ImportController extends Controller
         );
 
         return $this->created([
-            'import_batch_id' => $batch->id,
+            'import_batch_id' => $batch->public_id,
             'status'          => $batch->status,
             'type'            => 'competitors_html',
         ]);
@@ -72,7 +73,7 @@ class ImportController extends Controller
         $batch = $this->importService->confirmMapping($importBatch, $request->validated('mapping'));
 
         return $this->success([
-            'import_batch_id' => $batch->id,
+            'import_batch_id' => $batch->public_id,
             'status'          => $batch->status,
         ], 202);
     }
@@ -86,7 +87,7 @@ class ImportController extends Controller
             : 0;
 
         return $this->success([
-            'id'             => $importBatch->id,
+            'id'             => $importBatch->public_id,
             'type'           => $importBatch->type,
             'status'         => $importBatch->status,
             'total_rows'     => $importBatch->total_rows,

@@ -4,11 +4,14 @@ namespace App\Modules\Reports\Models;
 
 use App\Models\User;
 use App\Modules\Workspace\Models\Workspace;
+use App\Traits\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Report extends Model
 {
+    use HasPublicId;
+
     public $timestamps = false;
 
     protected $fillable = [

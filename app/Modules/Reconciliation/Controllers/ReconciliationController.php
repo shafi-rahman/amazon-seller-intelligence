@@ -42,7 +42,7 @@ class ReconciliationController extends Controller
 
         ReconciliationJob::dispatch($run->id)->onQueue('reconciliation');
 
-        return $this->success(['reconciliation_run_id' => $run->id, 'status' => 'pending'], 202);
+        return $this->success(['reconciliation_run_id' => $run->public_id, 'status' => 'pending'], 202);
     }
 
     // GET /workspaces/{id}/reconciliation
@@ -58,29 +58,32 @@ class ReconciliationController extends Controller
         return $this->paginated($runs);
     }
 
-    // GET /workspaces/{id}/reconciliation/{runId}
-    public function show(Request $request, int $workspaceId, int $runId): JsonResponse
+    // GET /workspaces/{id}/reconciliation/{runId}  (runId = UUID)
+    public function show(Request $request, int $workspaceId, string $runId): JsonResponse
     {
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
 
         $run = ReconciliationRun::where('workspace_id', $workspaceId)
+            ->where('public_id', $runId)
             ->with('reports')
-            ->findOrFail($runId);
+            ->firstOrFail();
 
         return $this->success(new ReconciliationRunResource($run));
     }
 
-    // GET /workspaces/{id}/reconciliation/{runId}/status
-    public function status(Request $request, int $workspaceId, int $runId): JsonResponse
+    // GET /workspaces/{id}/reconciliation/{runId}/status  (runId = UUID)
+    public function status(Request $request, int $workspaceId, string $runId): JsonResponse
     {
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
 
-        $run = ReconciliationRun::where('workspace_id', $workspaceId)->findOrFail($runId);
+        $run = ReconciliationRun::where('workspace_id', $workspaceId)
+            ->where('public_id', $runId)
+            ->firstOrFail();
 
         return $this->success([
-            'id'           => $run->id,
+            'id'           => $run->public_id,
             'status'       => $run->status,
             'summary'      => $run->summary,
             'started_at'   => $run->started_at?->toISOString(),
@@ -88,13 +91,17 @@ class ReconciliationController extends Controller
         ]);
     }
 
-    // GET /workspaces/{id}/reconciliation/{runId}/reports/{type}
-    public function report(Request $request, int $workspaceId, int $runId, string $type): JsonResponse
+    // GET /workspaces/{id}/reconciliation/{runId}/reports/{type}  (runId = UUID)
+    public function report(Request $request, int $workspaceId, string $runId, string $type): JsonResponse
     {
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
 
-        $report = ReconciliationReport::where('reconciliation_run_id', $runId)
+        $run = ReconciliationRun::where('workspace_id', $workspaceId)
+            ->where('public_id', $runId)
+            ->firstOrFail();
+
+        $report = ReconciliationReport::where('reconciliation_run_id', $run->id)
             ->where('workspace_id', $workspaceId)
             ->where('report_type', $type)
             ->firstOrFail();
@@ -120,8 +127,8 @@ class ReconciliationController extends Controller
         ]);
     }
 
-    // POST /workspaces/{id}/reconciliation/{runId}/reports/{type}/export
-    public function export(Request $request, int $workspaceId, int $runId, string $type): JsonResponse
+    // POST /workspaces/{id}/reconciliation/{runId}/reports/{type}/export  (runId = UUID)
+    public function export(Request $request, int $workspaceId, string $runId, string $type): JsonResponse
     {
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
@@ -130,7 +137,8 @@ class ReconciliationController extends Controller
             'format' => ['required', Rule::in(['csv', 'pdf'])],
         ]);
 
-        $report = ReconciliationReport::where('reconciliation_run_id', $runId)
+        $run    = ReconciliationRun::where('workspace_id', $workspaceId)->where('public_id', $runId)->firstOrFail();
+        $report = ReconciliationReport::where('reconciliation_run_id', $run->id)
             ->where('workspace_id', $workspaceId)
             ->where('report_type', $type)
             ->firstOrFail();

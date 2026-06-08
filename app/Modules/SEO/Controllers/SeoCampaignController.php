@@ -63,15 +63,16 @@ class SeoCampaignController extends Controller
         return $this->paginated($query->paginate(20));
     }
 
-    // GET /workspaces/{workspaceId}/seo/campaigns/{id}
-    public function show(Request $request, int $workspaceId, int $id): JsonResponse
+    // GET /workspaces/{workspaceId}/seo/campaigns/{uuid}
+    public function show(Request $request, int $workspaceId, string $id): JsonResponse
     {
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
 
         $campaign = SeoCampaign::where('workspace_id', $workspaceId)
+            ->where('public_id', $id)
             ->with(['product', 'posts'])
-            ->findOrFail($id);
+            ->firstOrFail();
 
         return $this->success(new SeoCampaignResource($campaign));
     }
@@ -119,14 +120,15 @@ class SeoCampaignController extends Controller
         return $this->success(['post_id' => $post->id, 'status' => 'rejected']);
     }
 
-    // GET /seo/campaigns/{id}/product-data  (for OpenClaw skill)
-    // Uses a webhook token instead of session auth
-    public function productData(Request $request, int $id): JsonResponse
+    // GET /seo/campaigns/{uuid}/product-data  (for OpenClaw skill)
+    public function productData(Request $request, string $id): JsonResponse
     {
         $token = $request->query('token') ?? $request->header('X-Webhook-Token');
         abort_unless($token === config('app.seo_webhook_token'), 401);
 
-        $campaign = SeoCampaign::with(['product.keywords'])->findOrFail($id);
+        $campaign = SeoCampaign::with(['product.keywords'])
+            ->where('public_id', $id)
+            ->firstOrFail();
         $product  = $campaign->product;
 
         return response()->json([

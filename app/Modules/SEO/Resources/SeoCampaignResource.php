@@ -14,7 +14,8 @@ class SeoCampaignResource extends JsonResource
         $totalPosts    = $posts ? $posts->count() : 0;
 
         return [
-            'id'            => $this->id,
+            'id'            => $this->public_id, // UUID — used in browser URLs
+            'uuid'          => $this->public_id,
             'product'       => $this->whenLoaded('product', fn() => [
                 'id'    => $this->product->id,
                 'asin'  => $this->product->asin,

@@ -5,12 +5,15 @@ namespace App\Modules\SEO\Models;
 use App\Models\User;
 use App\Modules\Products\Models\Product;
 use App\Modules\Workspace\Models\Workspace;
+use App\Traits\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SeoCampaign extends Model
 {
+    use HasPublicId;
+
     protected $fillable = [
         'product_id', 'workspace_id', 'user_id',
         'status', 'trend_data', 'ai_provider', 'ai_model', 'generated_at',

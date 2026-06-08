@@ -10,7 +10,7 @@ const importStore = useImportStore()
 
 const status    = ref<ImportStatus | null>(null)
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
-const batchId   = Number(route.params.id)
+const batchId   = route.params.id as string  // UUID (public_id)
 
 const IMPORT_LABELS: Record<string, string> = {
     orders: 'Amazon Orders', settlements: 'Settlements',

@@ -4,12 +4,15 @@ namespace App\Modules\Reconciliation\Models;
 
 use App\Models\User;
 use App\Modules\Workspace\Models\Workspace;
+use App\Traits\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ReconciliationRun extends Model
 {
+    use HasPublicId;
+
     protected $fillable = [
         'workspace_id', 'user_id', 'period_start', 'period_end',
         'status', 'summary', 'started_at', 'completed_at',

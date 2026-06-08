@@ -4,12 +4,15 @@ namespace App\Modules\Products\Models;
 
 use App\Modules\Imports\Models\ImportBatch;
 use App\Modules\Workspace\Models\Workspace;
+use App\Traits\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
+    use HasPublicId;
+
     protected $fillable = [
         'workspace_id', 'import_batch_id', 'asin', 'sku', 'title', 'brand',
         'category', 'sub_category', 'bullet_1', 'bullet_2', 'bullet_3',

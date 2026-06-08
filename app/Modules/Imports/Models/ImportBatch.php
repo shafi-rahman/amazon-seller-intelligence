@@ -5,6 +5,7 @@ namespace App\Modules\Imports\Models;
 use App\Models\User;
 use App\Modules\Workspace\Models\Workspace;
 use Database\Factories\ImportBatchFactory;
+use App\Traits\HasPublicId;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ImportBatch extends Model
 {
+    use HasPublicId;
+
     /** @use HasFactory<ImportBatchFactory> */
     use HasFactory;
 

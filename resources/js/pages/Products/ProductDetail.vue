@@ -112,7 +112,7 @@ function barColor(score: number, max: number) {
                         <span v-if="product.sku" class="text-xs text-gray-400">SKU: {{ product.sku }}</span>
                         <span v-if="product.brand" class="text-xs text-gray-500">{{ product.brand }}</span>
                     </div>
-                    <h2 class="text-sm text-gray-700 leading-snug mb-2">{{ product.title }}</h2>
+                    <h2 class="text-sm text-gray-700 leading-snug mb-2 line-clamp-2" :title="product.title">{{ product.title }}</h2>
                     <div class="flex items-center gap-4 text-xs text-gray-500">
                         <span v-if="product.price">₹{{ product.price?.toLocaleString('en-IN') }}</span>
                         <span v-if="product.rating">{{ product.rating }}★ ({{ product.review_count }} reviews)</span>

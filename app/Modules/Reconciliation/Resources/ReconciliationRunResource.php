@@ -10,7 +10,8 @@ class ReconciliationRunResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'           => $this->id,
+            'id'           => $this->public_id,
+            'uuid'         => $this->public_id,
             'period_start' => $this->period_start?->toDateString(),
             'period_end'   => $this->period_end?->toDateString(),
             'status'       => $this->status,

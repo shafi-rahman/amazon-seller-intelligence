@@ -5,6 +5,7 @@ namespace App\Modules\Competitors\Models;
 use App\Modules\Imports\Models\ImportBatch;
 use App\Modules\Products\Models\Product;
 use App\Modules\Workspace\Models\Workspace;
+use App\Traits\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Competitor extends Model
 {
+    use HasPublicId;
+
     protected $fillable = [
         'workspace_id', 'product_id', 'import_batch_id', 'asin', 'title', 'brand',
         'category', 'bullet_1', 'bullet_2', 'bullet_3', 'bullet_4', 'bullet_5',
