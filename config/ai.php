@@ -23,8 +23,15 @@ return [
             'api_key' => env('GROQ_API_KEY'),
             'model'   => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
             'api_url' => 'https://api.groq.com/openai/v1',
-            // Groq uses OpenAI-compatible API format
-            // Note: Groq does NOT offer embedding models — use openai or ollama for embeddings
+        ],
+
+        'nvidia' => [
+            'api_key'          => env('NVIDIA_API_KEY'),
+            'model'            => env('NVIDIA_MODEL', 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning'),
+            'api_url'          => 'https://integrate.api.nvidia.com/v1',
+            // Reasoning model — supports thinking budget for deeper analysis
+            'reasoning_budget' => (int) env('NVIDIA_REASONING_BUDGET', 16384),
+            'enable_thinking'  => (bool) env('NVIDIA_ENABLE_THINKING', true),
         ],
 
         'gemini' => [
@@ -40,8 +47,10 @@ return [
     ],
 
     // Primary provider for reasoning tasks (AI Copilot, listing analysis, rewrite)
-    // groq = fast & cheap LLM via llama-3.3-70b | anthropic = Claude (higher quality)
-    'default_provider' => env('AI_DEFAULT_PROVIDER', 'groq'),
+    // nvidia = Nemotron reasoning model (deep analysis, longer thinking)
+    // groq  = fast LLM (quick responses)
+    // anthropic = Claude (high quality fallback)
+    'default_provider' => env('AI_DEFAULT_PROVIDER', 'nvidia'),
 
     // Provider used for embeddings
     'embedding_provider' => env('APP_ENV') === 'local' && empty(env('OPENAI_API_KEY'))

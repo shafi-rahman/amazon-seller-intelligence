@@ -10,11 +10,12 @@ class AIRouter
 {
     /**
      * Provider priority order. First configured provider wins.
-     * Groq is primary (fast, cheap, OpenAI-compatible).
-     * Anthropic Claude is higher-quality fallback.
-     * OpenAI GPT-4o-mini is final fallback.
+     * nvidia = Nemotron reasoning model (deep analysis, thinking budget)
+     * groq   = fast LLM (quick responses, OpenAI-compatible)
+     * anthropic = Claude (high quality)
+     * openai = GPT-4o-mini (final fallback)
      */
-    private array $providerChain = ['groq', 'anthropic', 'openai'];
+    private array $providerChain = ['nvidia', 'groq', 'anthropic', 'openai'];
 
     /**
      * Send a chat request and return the assistant response text.
@@ -25,7 +26,7 @@ class AIRouter
         int    $maxTokens = 2048,
         int    $workspaceId = 0,
     ): array {
-        $preferred = config('ai.default_provider', 'groq');
+        $preferred = config('ai.default_provider', 'nvidia');
 
         // Reorder chain to try preferred provider first
         $chain = array_unique(array_merge([$preferred], $this->providerChain));
@@ -82,6 +83,7 @@ class AIRouter
     private function callProvider(string $provider, array $messages, int $maxTokens): array
     {
         return match ($provider) {
+            'nvidia'    => $this->callNvidia($messages, $maxTokens),
             'groq'      => $this->callOpenAICompatible(
                 config('ai.providers.groq.api_url').'/chat/completions',
                 config('ai.providers.groq.api_key'),
@@ -189,11 +191,63 @@ class AIRouter
         ];
     }
 
+    private function callNvidia(array $messages, int $maxTokens): array
+    {
+        $model   = config('ai.providers.nvidia.model', 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning');
+        $apiKey  = config('ai.providers.nvidia.api_key');
+        $url     = config('ai.providers.nvidia.api_url').'/chat/completions';
+
+        $payload = [
+            'model'       => $model,
+            'messages'    => $messages,
+            'temperature' => 0.6,
+            'top_p'       => 0.95,
+            'max_tokens'  => $maxTokens,
+            'stream'      => false,
+        ];
+
+        // Nemotron reasoning model extras
+        if (config('ai.providers.nvidia.enable_thinking', true)) {
+            $payload['reasoning_budget']      = config('ai.providers.nvidia.reasoning_budget', 16384);
+            $payload['chat_template_kwargs']  = ['enable_thinking' => true];
+        }
+
+        $response = Http::withHeaders([
+            'Authorization' => "Bearer {$apiKey}",
+            'Content-Type'  => 'application/json',
+            'Accept'        => 'application/json',
+        ])
+            ->timeout(180) // reasoning models take longer
+            ->post($url, $payload);
+
+        if (!$response->ok()) {
+            throw new \RuntimeException(
+                'NVIDIA API error '.$response->status().': '.$response->body()
+            );
+        }
+
+        $data    = $response->json();
+        $content = $data['choices'][0]['message']['content'] ?? '';
+
+        // Strip <think>...</think> block if present (internal reasoning, not user-facing)
+        $content = preg_replace('/<think>.*?<\/think>/s', '', $content);
+        $content = trim($content);
+
+        return [
+            'content'           => $content,
+            'provider'          => 'nvidia',
+            'model'             => $model,
+            'prompt_tokens'     => $data['usage']['prompt_tokens'] ?? 0,
+            'completion_tokens' => $data['usage']['completion_tokens'] ?? 0,
+        ];
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────
 
     private function isProviderConfigured(string $provider): bool
     {
         return match ($provider) {
+            'nvidia'    => !empty(config('ai.providers.nvidia.api_key')),
             'groq'      => !empty(config('ai.providers.groq.api_key')),
             'anthropic' => !empty(config('ai.providers.anthropic.api_key')),
             'openai'    => !empty(config('ai.providers.openai.api_key')),
