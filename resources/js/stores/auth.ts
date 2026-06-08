@@ -9,10 +9,18 @@ export const useAuthStore = defineStore('auth', () => {
 
     const isAuthenticated = computed(() => user.value !== null)
 
+    // API responses have two shapes depending on endpoint:
+    //   GET /auth/me  → { data: { id, name, email, ... } }   (user is data root)
+    //   POST /login   → { data: { user: { id, name, ... } } } (user nested under key)
+    function extractUser(data: Record<string, unknown>): User | null {
+        const payload = (data.data ?? data) as Record<string, unknown>
+        return (payload.user ?? payload) as User | null
+    }
+
     async function fetchUser(): Promise<void> {
         try {
             const { data } = await api.get('/auth/me')
-            user.value = data.data ?? data
+            user.value = extractUser(data)
         } catch {
             user.value = null
         }
@@ -23,7 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             await getCsrfCookie()
             const { data } = await api.post('/auth/login', { email, password })
-            user.value = data.data?.user ?? data.user
+            user.value = extractUser(data)
         } finally {
             loading.value = false
         }
@@ -40,7 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             await getCsrfCookie()
             const { data } = await api.post('/auth/register', payload)
-            user.value = data.data?.user ?? data.user
+            user.value = extractUser(data)
         } finally {
             loading.value = false
         }

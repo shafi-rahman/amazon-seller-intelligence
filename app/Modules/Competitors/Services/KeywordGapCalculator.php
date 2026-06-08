@@ -35,7 +35,7 @@ class KeywordGapCalculator
             if ($ourData === null) {
                 // Also try singular/plural variants
                 $variant = $this->singularize($normalized);
-                $ourData = $ourMap[$variant] ?? ($variant !== $normalized ? null : null);
+                $ourData = $ourMap[$variant] ?? null;
             }
 
             if ($ourData === null) {

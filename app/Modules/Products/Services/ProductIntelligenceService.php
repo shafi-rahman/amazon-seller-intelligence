@@ -66,8 +66,8 @@ class ProductIntelligenceService
                 ProductAnalysis::create([
                     'product_id'        => $product->id,
                     'analysis_type'     => 'optimization_suggestions',
-                    'ai_provider'       => 'anthropic',
-                    'ai_model'          => config('ai.providers.anthropic.model'),
+                    'ai_provider'       => $aiResult['provider'] ?? config('ai.default_provider'),
+                    'ai_model'          => $aiResult['model'] ?? null,
                     'prompt_tokens'     => $aiResult['prompt_tokens'] ?? null,
                     'completion_tokens' => $aiResult['completion_tokens'] ?? null,
                     'analysis_data'     => $aiResult['analysis_data'] ?? [],

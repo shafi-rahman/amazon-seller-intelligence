@@ -70,6 +70,7 @@ class ReconciliationEngine
               AND o.purchase_date >= :from_date::timestamptz
               AND o.purchase_date <= :to_date::timestamptz
               AND o.order_status NOT IN ('Cancelled', 'Pending')
+            ORDER BY o.id ASC, s.id ASC
         ", [
             'run_id'       => $run->id,
             'workspace_id' => $run->workspace_id,

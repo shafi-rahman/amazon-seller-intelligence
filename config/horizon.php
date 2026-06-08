@@ -183,7 +183,7 @@ return [
     |
     */
 
-    'memory_limit' => 64,
+    'memory_limit' => 256, // MB — reconciliation + import jobs need headroom
 
     /*
     |--------------------------------------------------------------------------
@@ -214,36 +214,16 @@ return [
 
     'environments' => [
         'production' => [
-            'supervisor-imports' => [
-                'connection'       => 'redis',
-                'queue'            => ['imports'],
-                'maxProcesses'     => 3,
-                'memory'           => 512,
-                'timeout'          => 600,
-                'balanceMaxShift'  => 1,
-                'balanceCooldown'  => 3,
-            ],
-            'supervisor-default' => [
-                'connection'       => 'redis',
-                'queue'            => ['default', 'reconciliation', 'ai', 'reports', 'embeddings'],
-                'maxProcesses'     => 5,
-                'balanceMaxShift'  => 1,
-                'balanceCooldown'  => 3,
+            'supervisor-1' => [
+                'maxProcesses' => 10,
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 3,
             ],
         ],
 
         'local' => [
-            'supervisor-imports' => [
-                'connection'   => 'redis',
-                'queue'        => ['imports'],
-                'maxProcesses' => 2,
-                'memory'       => 512,
-                'timeout'      => 600,
-            ],
-            'supervisor-default' => [
-                'connection'   => 'redis',
-                'queue'        => ['default', 'reconciliation', 'ai', 'reports', 'embeddings'],
-                'maxProcesses' => 2,
+            'supervisor-1' => [
+                'maxProcesses' => 3,
             ],
         ],
     ],

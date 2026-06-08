@@ -2,20 +2,22 @@
 
 namespace App\Modules\Products\Services;
 
+use App\Modules\AI\Services\AIRouter;
 use App\Modules\Products\Models\Product;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class AiAnalysisService
 {
+    public function __construct(private readonly AIRouter $router) {}
+
     public function isConfigured(): bool
     {
-        return !empty(config('ai.providers.anthropic.api_key'));
+        return $this->router->isAnyProviderConfigured();
     }
 
     /**
-     * Call Claude for structured listing analysis. Returns null if not configured
-     * or if the call fails — callers should fall back to rule-based data.
+     * Run AI listing analysis via the active provider (NVIDIA / Groq / Claude).
+     * Returns null if no provider is configured or the call fails.
      */
     public function analyzeListingWithClaude(Product $product, array $scoredData): ?array
     {
@@ -26,35 +28,18 @@ class AiAnalysisService
         $prompt = $this->buildListingPrompt($product, $scoredData);
 
         try {
-            $response = Http::withHeaders([
-                'x-api-key'         => config('ai.providers.anthropic.api_key'),
-                'anthropic-version' => config('ai.providers.anthropic.version'),
-                'content-type'      => 'application/json',
-            ])
-                ->timeout(60)
-                ->post(config('ai.providers.anthropic.api_url'), [
-                    'model'      => config('ai.providers.anthropic.model'),
-                    'max_tokens' => config('ai.providers.anthropic.max_tokens'),
-                    'messages'   => [
-                        ['role' => 'user', 'content' => $prompt],
-                    ],
-                ]);
+            $result = $this->router->chat([
+                ['role' => 'user', 'content' => $prompt],
+            ], 'listing', 4096);
 
-            if (!$response->ok()) {
-                Log::warning('Anthropic API error', [
-                    'status' => $response->status(),
-                    'body'   => $response->body(),
-                ]);
-                return null;
-            }
-
-            $text   = $response->json('content.0.text', '');
-            $parsed = $this->extractJson($text);
+            $parsed = $this->extractJson($result['content']);
 
             return [
                 'analysis_data'     => $parsed,
-                'prompt_tokens'     => $response->json('usage.input_tokens', 0),
-                'completion_tokens' => $response->json('usage.output_tokens', 0),
+                'prompt_tokens'     => $result['prompt_tokens'],
+                'completion_tokens' => $result['completion_tokens'],
+                'provider'          => $result['provider'],
+                'model'             => $result['model'],
             ];
         } catch (\Throwable $e) {
             Log::warning('AI listing analysis failed', ['error' => $e->getMessage()]);
@@ -63,7 +48,7 @@ class AiAnalysisService
     }
 
     /**
-     * Generate AI-powered rewrites for title, bullets, and description.
+     * Generate AI-powered rewrites via the active provider.
      */
     public function generateRewrite(Product $product, array $missingKeywords): ?array
     {
@@ -74,26 +59,11 @@ class AiAnalysisService
         $prompt = $this->buildRewritePrompt($product, $missingKeywords);
 
         try {
-            $response = Http::withHeaders([
-                'x-api-key'         => config('ai.providers.anthropic.api_key'),
-                'anthropic-version' => config('ai.providers.anthropic.version'),
-                'content-type'      => 'application/json',
-            ])
-                ->timeout(90)
-                ->post(config('ai.providers.anthropic.api_url'), [
-                    'model'      => config('ai.providers.anthropic.model'),
-                    'max_tokens' => 4096,
-                    'messages'   => [
-                        ['role' => 'user', 'content' => $prompt],
-                    ],
-                ]);
+            $result = $this->router->chat([
+                ['role' => 'user', 'content' => $prompt],
+            ], 'listing', 4096);
 
-            if (!$response->ok()) {
-                return null;
-            }
-
-            $text = $response->json('content.0.text', '');
-            return $this->extractJson($text);
+            return $this->extractJson($result['content']);
         } catch (\Throwable $e) {
             Log::warning('AI rewrite generation failed', ['error' => $e->getMessage()]);
             return null;
