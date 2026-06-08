@@ -14,7 +14,7 @@ const meta       = ref<any>({})
 const loading    = ref(false)
 const page       = ref(1)
 
-const productId = Number(route.params.productId)
+const productId = route.params.productId as string  // UUID
 
 async function load() {
     const wsId = workspaceStore.current?.id

@@ -54,6 +54,20 @@ trait HasPublicId
     }
 
     /**
+     * When a model is serialized to array (e.g. via $paginator->items()), replace
+     * the integer 'id' with public_id (UUID) so that paginated() responses are
+     * consistent with JsonResource responses — both return UUID as 'id'.
+     */
+    public function toArray(): array
+    {
+        $data = parent::toArray();
+        if (!empty($this->public_id)) {
+            $data['id'] = $this->public_id;
+        }
+        return $data;
+    }
+
+    /**
      * Override resolveRouteBinding to guard against invalid UUID format.
      * Called by Laravel's route model binding — protects all implicit bindings.
      */

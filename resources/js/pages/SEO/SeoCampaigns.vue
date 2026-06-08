@@ -37,7 +37,7 @@ async function filter() {
     if (wsId) await seoStore.fetchCampaigns(wsId, statusFilter.value || undefined)
 }
 
-function openCampaign(id: number) {
+function openCampaign(id: string) {
     router.push(`/seo/campaigns/${id}`)
 }
 

@@ -20,7 +20,7 @@ const editedRewrite = ref<Record<string, string>>({})
 
 onMounted(async () => {
     const wsId = workspaceStore.current?.id
-    const id   = Number(route.params.id)
+    const id   = route.params.id as string  // UUID
     if (!wsId || !id) return
     await productsStore.fetchOne(wsId, id)
 })

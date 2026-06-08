@@ -31,10 +31,9 @@ const STATUS_COLORS: Record<string, string> = {
 
 onMounted(async () => {
     const wsId = workspaceStore.current?.id
-    const id   = Number(route.params.id)
+    const id   = route.params.id as string  // UUID string — do NOT convert to Number()
     if (!wsId || !id) return
     await seoStore.fetchCampaign(wsId, id)
-    // Auto-select first post
     if (seoStore.current?.posts?.length) {
         activePost.value = seoStore.current.posts[0]
     }

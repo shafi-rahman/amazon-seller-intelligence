@@ -26,16 +26,16 @@ const REPORT_LABELS: Record<string, string> = {
 
 onMounted(async () => {
     const wsId = workspaceStore.current?.id
-    const runId = Number(route.params.id)
+    const runId = route.params.id as string  // UUID
     if (!wsId || !runId) return
-    run.value = await reconciliationStore.fetchRun(wsId, runId)
+    run.value  = await reconciliationStore.fetchRun(wsId, runId)
     // Auto-load summary
     await loadReport('summary')
 })
 
 async function loadReport(type: string) {
     const wsId  = workspaceStore.current?.id
-    const runId = Number(route.params.id)
+    const runId = route.params.id as string  // UUID
     if (!wsId || !runId) return
     activeReport.value  = type
     reportLoading.value = true
@@ -49,7 +49,7 @@ async function loadReport(type: string) {
 
 async function exportReport(format: string) {
     const wsId  = workspaceStore.current?.id
-    const runId = Number(route.params.id)
+    const runId = route.params.id as string  // UUID
     if (!wsId || !runId || !activeReport.value) return
     exporting.value = true
     try {

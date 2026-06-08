@@ -9,7 +9,7 @@ const workspaceStore = useWorkspaceStore()
 
 const loading   = ref(false)
 const data      = ref<any>(null)
-const productId = Number(route.params.productId)
+const productId = route.params.productId as string  // UUID
 
 onMounted(async () => {
     const wsId = workspaceStore.current?.id

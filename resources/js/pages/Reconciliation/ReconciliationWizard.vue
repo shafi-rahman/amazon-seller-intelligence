@@ -9,7 +9,7 @@ const workspaceStore    = useWorkspaceStore()
 const reconciliationStore = useReconciliationStore()
 
 const step = ref<'select' | 'running' | 'done' | 'error'>('select')
-const runId   = ref<number | null>(null)
+const runId   = ref<string | null>(null)
 const runData = ref<any>(null)
 const error   = ref('')
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)

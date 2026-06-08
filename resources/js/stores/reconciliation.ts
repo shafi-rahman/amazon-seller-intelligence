@@ -17,7 +17,7 @@ export const useReconciliationStore = defineStore('reconciliation', () => {
         }
     }
 
-    async function startRun(workspaceId: number, periodStart: string, periodEnd: string): Promise<{ reconciliation_run_id: number }> {
+    async function startRun(workspaceId: number, periodStart: string, periodEnd: string): Promise<{ reconciliation_run_id: string }> {
         const { data } = await api.post(`/workspaces/${workspaceId}/reconciliation/run`, {
             period_start: periodStart,
             period_end:   periodEnd,
@@ -25,18 +25,18 @@ export const useReconciliationStore = defineStore('reconciliation', () => {
         return data.data ?? data
     }
 
-    async function pollStatus(workspaceId: number, runId: number): Promise<any> {
+    async function pollStatus(workspaceId: number, runId: string): Promise<any> {
         const { data } = await api.get(`/workspaces/${workspaceId}/reconciliation/${runId}/status`)
         return data.data ?? data
     }
 
-    async function fetchRun(workspaceId: number, runId: number): Promise<any> {
+    async function fetchRun(workspaceId: number, runId: string): Promise<any> {
         const { data } = await api.get(`/workspaces/${workspaceId}/reconciliation/${runId}`)
         current.value  = data.data ?? data
         return current.value
     }
 
-    async function fetchReport(workspaceId: number, runId: number, type: string, page = 1): Promise<any> {
+    async function fetchReport(workspaceId: number, runId: string, type: string, page = 1): Promise<any> {
         const { data } = await api.get(
             `/workspaces/${workspaceId}/reconciliation/${runId}/reports/${type}`,
             { params: { page } }
@@ -44,7 +44,7 @@ export const useReconciliationStore = defineStore('reconciliation', () => {
         return data.data ?? data
     }
 
-    async function requestExport(workspaceId: number, runId: number, type: string, format: string): Promise<void> {
+    async function requestExport(workspaceId: number, runId: string, type: string, format: string): Promise<void> {
         await api.post(`/workspaces/${workspaceId}/reconciliation/${runId}/reports/${type}/export`, { format })
     }
 

@@ -12,7 +12,7 @@ const meta    = ref<any>({})
 const loading = ref(false)
 const gapType = ref('')
 const page    = ref(1)
-const productId = Number(route.params.productId)
+const productId = route.params.productId as string  // UUID
 
 const GAP_COLORS: Record<string, string> = {
     missing:   'bg-red-100 text-red-700',

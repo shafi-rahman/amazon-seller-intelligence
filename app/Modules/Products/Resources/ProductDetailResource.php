@@ -13,7 +13,7 @@ class ProductDetailResource extends JsonResource
         $aiAnalysis     = $this->latestAnalysis('optimization_suggestions');
 
         return [
-            'id'               => $this->id,
+            'id'               => $this->public_id,
             'asin'             => $this->asin,
             'sku'              => $this->sku,
             'title'            => $this->title,

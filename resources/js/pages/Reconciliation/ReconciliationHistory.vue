@@ -57,7 +57,7 @@ const fmt = (v: number) => '₹' + (v ?? 0).toLocaleString('en-IN', { minimumFra
                         </td>
                     </tr>
                     <tr v-for="run in reconciliationStore.runs" :key="run.id" class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-gray-700 font-mono text-xs">#{{ run.id }}</td>
+                        <td class="px-4 py-3 text-gray-500 font-mono text-xs" :title="run.id">{{ run.id?.slice(0, 8) }}…</td>
                         <td class="px-4 py-3 text-gray-700 text-xs">{{ run.period_start }} → {{ run.period_end }}</td>
                         <td class="px-4 py-3">
                             <span :class="['px-2 py-0.5 rounded-full text-xs font-medium', STATUS_COLORS[run.status] ?? 'bg-gray-100 text-gray-600']">

@@ -57,7 +57,7 @@ export const useSeoStore = defineStore('seo', () => {
         }
     }
 
-    async function fetchCampaign(workspaceId: number, id: number): Promise<SeoCampaign> {
+    async function fetchCampaign(workspaceId: number, id: string): Promise<SeoCampaign> {
         const { data } = await api.get(`/workspaces/${workspaceId}/seo/campaigns/${id}`)
         current.value  = data.data ?? data
         return current.value!

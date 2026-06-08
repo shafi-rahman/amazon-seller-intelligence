@@ -14,7 +14,7 @@ class ImportBatchResource extends JsonResource
             : 0;
 
         return [
-            'id'               => $this->id,
+            'id'               => $this->public_id,
             'type'             => $this->type,
             'original_filename'=> $this->original_filename,
             'status'           => $this->status,

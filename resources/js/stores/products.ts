@@ -20,7 +20,7 @@ export const useProductsStore = defineStore('products', () => {
         }
     }
 
-    async function fetchOne(workspaceId: number, productId: number): Promise<any> {
+    async function fetchOne(workspaceId: number, productId: string): Promise<any> {
         loading.value = true
         try {
             const { data } = await api.get(`/workspaces/${workspaceId}/products/${productId}`)
@@ -31,11 +31,11 @@ export const useProductsStore = defineStore('products', () => {
         }
     }
 
-    async function triggerAnalysis(workspaceId: number, productId: number): Promise<void> {
+    async function triggerAnalysis(workspaceId: number, productId: string): Promise<void> {
         await api.post(`/workspaces/${workspaceId}/products/${productId}/analyze`)
     }
 
-    async function generateRewrite(workspaceId: number, productId: number): Promise<void> {
+    async function generateRewrite(workspaceId: number, productId: string): Promise<void> {
         rewriteLoading.value = true
         try {
             const { data } = await api.post(`/workspaces/${workspaceId}/products/${productId}/rewrite`)
