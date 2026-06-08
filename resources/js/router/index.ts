@@ -52,6 +52,12 @@ const router = createRouter({
                     name: 'reports',
                     component: () => import('@/pages/Reports/ReportsDashboard.vue'),
                 },
+                // Settings
+                {
+                    path: 'settings',
+                    name: 'settings',
+                    component: () => import('@/pages/Settings/SettingsPage.vue'),
+                },
                 // SEO Agent
                 {
                     path: 'seo',

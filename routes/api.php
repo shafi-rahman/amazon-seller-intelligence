@@ -13,3 +13,4 @@ require __DIR__.'/../app/Modules/Competitors/Routes/api.php';
 require __DIR__.'/../app/Modules/AI/Routes/api.php';
 require __DIR__.'/../app/Modules/Reports/Routes/api.php';
 require __DIR__.'/../app/Modules/SEO/Routes/api.php';
+require __DIR__.'/../app/Modules/Settings/Routes/api.php';

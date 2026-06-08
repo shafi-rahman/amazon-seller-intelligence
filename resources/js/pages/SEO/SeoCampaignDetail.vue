@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useSeoStore } from '@/stores/seo'
 import { useToastStore } from '@/stores/toast'
+import { useSettingsStore } from '@/stores/settings'
 import type { SeoPost } from '@/stores/seo'
 
 const route          = useRoute()
@@ -12,15 +13,20 @@ const workspaceStore = useWorkspaceStore()
 const seoStore       = useSeoStore()
 const toast          = useToastStore()
 
-const activePost    = ref<SeoPost | null>(null)
-const editingPost   = ref<SeoPost | null>(null)
-const editedCaption = ref('')
-const copying       = ref<number | null>(null)
+const settingsStore  = useSettingsStore()
+
+const activePost     = ref<SeoPost | null>(null)
+const editingPost    = ref<SeoPost | null>(null)
+const editedCaption  = ref('')
+const copying        = ref<number | null>(null)
+const publishing     = ref<number | null>(null)
 
 const STATUS_COLORS: Record<string, string> = {
-    draft:    'bg-gray-100 text-gray-600',
-    approved: 'bg-green-100 text-green-700',
-    rejected: 'bg-red-100 text-red-600',
+    draft:     'bg-gray-100 text-gray-600',
+    approved:  'bg-green-100 text-green-700',
+    rejected:  'bg-red-100 text-red-600',
+    published: 'bg-indigo-100 text-indigo-700',
+    failed:    'bg-red-100 text-red-700',
 }
 
 onMounted(async () => {
@@ -75,6 +81,23 @@ async function rejectPost(post: SeoPost) {
         toast.info('Post rejected')
     } catch {
         toast.error('Failed to reject')
+    }
+}
+
+async function publishPost(post: SeoPost) {
+    publishing.value = post.id
+    try {
+        await settingsStore.publishPost(post.id)
+        toast.success(`Publishing to ${seoStore.PLATFORM_LABELS[post.platform]}… check back in a moment.`)
+        // Refresh campaign after short delay
+        setTimeout(async () => {
+            const wsId = workspaceStore.current?.id
+            if (wsId && campaign.value) await seoStore.fetchCampaign(wsId, campaign.value.id)
+        }, 3000)
+    } catch (e: any) {
+        toast.error(e.response?.data?.message ?? 'Publish failed. Check Settings → Social Accounts.')
+    } finally {
+        publishing.value = null
     }
 }
 
@@ -222,6 +245,17 @@ const PLATFORM_GUIDE: Record<string, string> = {
                                 class="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 transition-colors">
                                 {{ copying === activePost.id ? '✓ Copied!' : '📋 Copy' }}
                             </button>
+                            <!-- Publish to platform -->
+                            <button v-if="activePost.status === 'approved'"
+                                @click="publishPost(activePost)"
+                                :disabled="publishing === activePost.id"
+                                class="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center gap-1">
+                                {{ publishing === activePost.id ? '⏳ Publishing…' : '🚀 Publish' }}
+                            </button>
+                            <span v-else-if="activePost.status === 'published'"
+                                class="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg">
+                                ✓ Published
+                            </span>
                             <!-- Edit & Approve -->
                             <button v-if="activePost.status === 'draft'"
                                 @click="startEdit(activePost)"
