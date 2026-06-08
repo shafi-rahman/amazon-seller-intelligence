@@ -35,14 +35,36 @@ trait HasPublicId
     }
 
     /**
-     * Resolve route binding — finds model by UUID, scoped to workspace if needed.
+     * Resolve route binding — finds model by UUID, returns 404 for non-UUID strings.
+     * Prevents PostgreSQL from throwing a cast error when old integer IDs are used.
      */
     public static function findByPublicId(string $publicId, ?int $workspaceId = null): static
     {
+        // Reject non-UUID format immediately with 404 (not 500)
+        if (!Str::isUuid($publicId)) {
+            abort(404, "Resource not found. URL format has changed — UUIDs are now required.");
+        }
+
         $query = static::where('public_id', $publicId);
         if ($workspaceId && in_array('workspace_id', (new static)->getFillable())) {
             $query->where('workspace_id', $workspaceId);
         }
+
         return $query->firstOrFail();
+    }
+
+    /**
+     * Override resolveRouteBinding to guard against invalid UUID format.
+     * Called by Laravel's route model binding — protects all implicit bindings.
+     */
+    public function resolveRouteBinding(mixed $value, $field = null): ?static
+    {
+        $field = $field ?? $this->getRouteKeyName();
+
+        if ($field === 'public_id' && !Str::isUuid((string) $value)) {
+            abort(404, "Resource not found. UUIDs are required in URLs.");
+        }
+
+        return $this->where($field, $value)->first();
     }
 }

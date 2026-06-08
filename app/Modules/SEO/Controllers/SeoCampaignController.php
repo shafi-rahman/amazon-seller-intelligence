@@ -69,10 +69,8 @@ class SeoCampaignController extends Controller
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
 
-        $campaign = SeoCampaign::where('workspace_id', $workspaceId)
-            ->where('public_id', $id)
-            ->with(['product', 'posts'])
-            ->firstOrFail();
+        $campaign = SeoCampaign::findByPublicId($id, $workspace->id);
+        $campaign->load(['product', 'posts']);
 
         return $this->success(new SeoCampaignResource($campaign));
     }
@@ -126,9 +124,8 @@ class SeoCampaignController extends Controller
         $token = $request->query('token') ?? $request->header('X-Webhook-Token');
         abort_unless($token === config('app.seo_webhook_token'), 401);
 
-        $campaign = SeoCampaign::with(['product.keywords'])
-            ->where('public_id', $id)
-            ->firstOrFail();
+        $campaign = SeoCampaign::findByPublicId($id);
+        $campaign->load('product.keywords');
         $product  = $campaign->product;
 
         return response()->json([

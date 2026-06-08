@@ -64,10 +64,8 @@ class ReconciliationController extends Controller
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
 
-        $run = ReconciliationRun::where('workspace_id', $workspaceId)
-            ->where('public_id', $runId)
-            ->with('reports')
-            ->firstOrFail();
+        $run = ReconciliationRun::findByPublicId($runId, $workspace->id);
+        $run->load('reports');
 
         return $this->success(new ReconciliationRunResource($run));
     }
@@ -78,9 +76,7 @@ class ReconciliationController extends Controller
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
 
-        $run = ReconciliationRun::where('workspace_id', $workspaceId)
-            ->where('public_id', $runId)
-            ->firstOrFail();
+        $run = ReconciliationRun::findByPublicId($runId, $workspace->id);
 
         return $this->success([
             'id'           => $run->public_id,
@@ -97,9 +93,7 @@ class ReconciliationController extends Controller
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
 
-        $run = ReconciliationRun::where('workspace_id', $workspaceId)
-            ->where('public_id', $runId)
-            ->firstOrFail();
+        $run = ReconciliationRun::findByPublicId($runId, $workspace->id);
 
         $report = ReconciliationReport::where('reconciliation_run_id', $run->id)
             ->where('workspace_id', $workspaceId)
@@ -137,7 +131,7 @@ class ReconciliationController extends Controller
             'format' => ['required', Rule::in(['csv', 'pdf'])],
         ]);
 
-        $run    = ReconciliationRun::where('workspace_id', $workspaceId)->where('public_id', $runId)->firstOrFail();
+        $run    = ReconciliationRun::findByPublicId($runId, $workspace->id);
         $report = ReconciliationReport::where('reconciliation_run_id', $run->id)
             ->where('workspace_id', $workspaceId)
             ->where('report_type', $type)
