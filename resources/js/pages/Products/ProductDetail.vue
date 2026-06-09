@@ -94,10 +94,10 @@ function barColor(score: number, max: number) {
 
 <template>
     <div class="p-6">
-        <div class="flex items-center gap-4 mb-6">
-            <RouterLink to="/products" class="text-sm text-indigo-600 hover:underline">← Products</RouterLink>
-            <span class="text-gray-300">|</span>
-            <h1 class="text-xl font-bold text-gray-900 truncate" v-if="product">
+        <div class="flex items-start gap-4 mb-6 min-w-0">
+            <RouterLink to="/products" class="text-sm text-indigo-600 hover:underline flex-shrink-0 mt-1">← Products</RouterLink>
+            <span class="text-gray-300 flex-shrink-0 mt-1">|</span>
+            <h1 class="text-xl font-bold text-gray-900 leading-snug break-words min-w-0" v-if="product">
                 {{ product.title ?? product.asin }}
             </h1>
         </div>
