@@ -42,6 +42,7 @@ class SeoCampaignResource extends JsonResource
                     'edited_caption' => $p->edited_caption,
                     'hashtags'       => $p->hashtags,
                     'image_prompt'   => $p->image_prompt,
+                    'image_url'      => $p->imageUrl(),
                     'status'         => $p->status,
                     'created_at'     => $p->created_at?->toISOString(),
                 ])

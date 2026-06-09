@@ -9,6 +9,7 @@ export interface SeoPost {
     edited_caption: string | null
     hashtags: string | null
     image_prompt: string | null
+    image_url: string | null
     status: 'draft' | 'approved' | 'rejected' | 'published'
     created_at: string | null
 }

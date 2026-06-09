@@ -16,7 +16,10 @@ class SeoContentService
     private const MODEL_CONTENT   = 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning';
     private const MODEL_FAST      = 'meta/llama-3.1-8b-instruct';
 
-    public function __construct(private readonly AIRouter $router) {}
+    public function __construct(
+        private readonly AIRouter $router,
+        private readonly SeoImageService $imageService,
+    ) {}
 
     /**
      * Full pipeline: trend research → 4 platform posts → save all
@@ -68,8 +71,9 @@ class SeoContentService
         }
 
         // Step 4: Save posts
+        $posts = [];
         foreach ($postsData as $platform => $data) {
-            SeoPost::create([
+            $posts[] = SeoPost::create([
                 'campaign_id'  => $campaign->id,
                 'platform'     => $platform,
                 'caption'      => $data['caption'] ?? null,
@@ -77,6 +81,24 @@ class SeoContentService
                 'image_prompt' => $data['image_prompt'] ?? null,
                 'status'       => 'draft',
             ]);
+        }
+
+        // Step 4.5: Generate ONE post image with NVIDIA FLUX and share it across
+        // all platforms (cheaper than 4 separate images for an MVP). Use the best
+        // available image_prompt, falling back to a prompt built from the product.
+        $imagePrompt = collect($postsData)->pluck('image_prompt')->filter()->first()
+            ?: $this->defaultImagePrompt($context);
+
+        $imagePath = $this->imageService->generate($imagePrompt, $campaign->workspace_id, $campaign->public_id);
+
+        // Fallback: if generation failed, reuse the product's primary uploaded image.
+        if (!$imagePath) {
+            $imagePath = optional($product->images()->where('is_primary', true)->first())->storage_path
+                ?? optional($product->images()->first())->storage_path;
+        }
+
+        if ($imagePath) {
+            SeoPost::where('campaign_id', $campaign->id)->update(['image_path' => $imagePath]);
         }
 
         // Step 5: Mark campaign ready for review
@@ -299,6 +321,13 @@ PROMPT;
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────
+
+    private function defaultImagePrompt(array $ctx): string
+    {
+        return "Professional product photography of {$ctx['title']}, {$ctx['category']} category, "
+            . "clean white background, soft studio lighting, high detail, commercial Amazon product shot, "
+            . "no text, no watermark, centered composition";
+    }
 
     private function buildProductContext(Product $product, array $trend): array
     {

@@ -4,6 +4,7 @@ namespace App\Modules\SEO\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class SeoPost extends Model
 {
@@ -32,5 +33,16 @@ class SeoPost extends Model
     public function activeCaptionAttribute(): string
     {
         return $this->edited_caption ?? $this->caption ?? '';
+    }
+
+    // Browser-reachable presigned URL for the generated post image (24h).
+    public function imageUrl(int $ttlHours = 24): ?string
+    {
+        if (empty($this->image_path)) return null;
+        try {
+            return Storage::disk('s3_public')->temporaryUrl($this->image_path, now()->addHours($ttlHours));
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }
