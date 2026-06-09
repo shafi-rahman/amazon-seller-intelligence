@@ -15,7 +15,10 @@ const toast          = useToastStore()
 
 const settingsStore  = useSettingsStore()
 
-const activePost     = ref<SeoPost | null>(null)
+// Track the selected post by id and derive activePost from the LIVE store array,
+// so store mutations (image regenerate/upload, edits) always reflect in the UI.
+// Holding a detached object reference here would miss those updates.
+const activePostId   = ref<number | null>(null)
 const copying        = ref<number | null>(null)
 const publishing     = ref<number | null>(null)
 const lightboxUrl    = ref<string | null>(null)
@@ -49,8 +52,8 @@ function stopPolling() {
 async function loadCampaign(wsId: string, id: string) {
     await seoStore.fetchCampaign(wsId, id)
     const c = seoStore.current
-    if (c?.posts?.length && !activePost.value) {
-        activePost.value = c.posts[0]
+    if (c?.posts?.length && activePostId.value === null) {
+        activePostId.value = c.posts[0].id
     }
     // Stop polling once generation has finished (or failed).
     if (c && c.status !== 'pending' && c.status !== 'generating') {
@@ -83,8 +86,13 @@ const allApproved = computed(() =>
     campaign.value?.posts?.every(p => p.status === 'approved' || p.status === 'rejected') ?? false
 )
 
+// Always resolved from the live store array → reflects all mutations.
+const activePost = computed(() =>
+    campaign.value?.posts?.find(p => p.id === activePostId.value) ?? null
+)
+
 function selectPost(post: SeoPost) {
-    activePost.value = post
+    activePostId.value = post.id
     editing.value = false
     showImageTools.value = false
     refPrompt.value = ''
