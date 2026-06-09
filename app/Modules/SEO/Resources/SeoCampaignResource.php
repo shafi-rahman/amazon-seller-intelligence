@@ -9,9 +9,12 @@ class SeoCampaignResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $posts = $this->whenLoaded('posts');
-        $approvedCount = $posts ? $posts->where('status', 'approved')->count() : 0;
-        $totalPosts    = $posts ? $posts->count() : 0;
+        // whenLoaded() returns a (truthy) MissingValue when the relation isn't
+        // loaded — calling ->where() on it throws. Check relationLoaded() instead.
+        $postsLoaded   = $this->resource->relationLoaded('posts');
+        $posts         = $postsLoaded ? $this->posts : collect();
+        $approvedCount = $posts->where('status', 'approved')->count();
+        $totalPosts    = $posts->count();
 
         return [
             'id'            => $this->public_id, // UUID — used in browser URLs
