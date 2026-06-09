@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useSeoStore } from '@/stores/seo'
@@ -29,15 +29,43 @@ const STATUS_COLORS: Record<string, string> = {
     failed:    'bg-red-100 text-red-700',
 }
 
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+}
+
+async function loadCampaign(wsId: string, id: string) {
+    await seoStore.fetchCampaign(wsId, id)
+    const c = seoStore.current
+    if (c?.posts?.length && !activePost.value) {
+        activePost.value = c.posts[0]
+    }
+    // Stop polling once generation has finished (or failed).
+    if (c && c.status !== 'pending' && c.status !== 'generating') {
+        stopPolling()
+    }
+}
+
 onMounted(async () => {
-    const wsId = workspaceStore.current?.id
+    // Workspace may not be loaded yet on a hard refresh — await it.
+    const ws   = await workspaceStore.ensureLoaded()
+    const wsId = ws?.id
     const id   = route.params.id as string  // UUID string — do NOT convert to Number()
     if (!wsId || !id) return
-    await seoStore.fetchCampaign(wsId, id)
-    if (seoStore.current?.posts?.length) {
-        activePost.value = seoStore.current.posts[0]
+
+    await loadCampaign(wsId, id)
+
+    // If the campaign is still being generated (the usual case right after DO SEO
+    // redirects here), poll until NVIDIA finishes so the posts appear without a
+    // manual refresh.
+    const st = seoStore.current?.status
+    if (st === 'pending' || st === 'generating') {
+        pollTimer = setInterval(() => loadCampaign(wsId, id), 3000)
     }
 })
+
+onUnmounted(stopPolling)
 
 const campaign = computed(() => seoStore.current)
 const allApproved = computed(() =>
@@ -122,7 +150,9 @@ const PLATFORM_GUIDE: Record<string, string> = {
     google_business: 'Copy post → Add Update in Google Business Profile',
 }
 </script>
-
+<style>
+.truncate{ white-space: break-spaces !important; }
+</style>
 <template>
     <div class="p-6">
         <!-- Header — flex with min-w-0 to prevent title overflow causing horizontal scroll -->
@@ -141,8 +171,8 @@ const PLATFORM_GUIDE: Record<string, string> = {
 
         <div v-if="!campaign" class="text-gray-400 text-sm text-center py-10">Loading…</div>
 
-        <!-- Generating state -->
-        <div v-else-if="campaign.status === 'generating'"
+        <!-- Generating / pending state -->
+        <div v-else-if="campaign.status === 'generating' || campaign.status === 'pending'"
             class="bg-white rounded-xl border border-gray-200 p-10 text-center">
             <div class="text-5xl mb-4">⚡</div>
             <h2 class="text-lg font-semibold text-gray-900 mb-2">NVIDIA is generating your content</h2>
