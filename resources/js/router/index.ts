@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useWorkspaceStore } from '@/stores/workspace'
 
 const router = createRouter({
     history: createWebHistory(),
@@ -197,6 +198,16 @@ router.beforeEach(async (to) => {
 
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
         return { name: 'login' }
+    }
+
+    // Ensure the workspace is loaded before any authenticated page mounts.
+    // Pages read workspaceStore.current.id in onMounted; on a hard refresh
+    // that would otherwise be null (the layout loads it fire-and-forget),
+    // leaving detail pages stuck on "Loading…". ensureLoaded() de-dupes
+    // concurrent calls, so this is cheap on subsequent navigations.
+    if (to.meta.requiresAuth && authStore.isAuthenticated) {
+        const workspaceStore = useWorkspaceStore()
+        await workspaceStore.ensureLoaded()
     }
 
     if (to.meta.guest && authStore.isAuthenticated) {

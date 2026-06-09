@@ -8,6 +8,10 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     const current = ref<Workspace | null>(null)
     const loading = ref(false)
 
+    // Shared in-flight promise so concurrent callers (layout + a detail page
+    // mounting on hard refresh) don't trigger duplicate /workspaces requests.
+    let loadPromise: Promise<void> | null = null
+
     async function fetchAll(): Promise<void> {
         loading.value = true
         try {
@@ -21,6 +25,19 @@ export const useWorkspaceStore = defineStore('workspace', () => {
         }
     }
 
+    // Guarantees the workspace list (and `current`) is loaded before use.
+    // Safe to call from any page's onMounted — on a hard refresh the layout's
+    // fire-and-forget fetchAll() may not have resolved yet, so pages that need
+    // `current.id` immediately should await this instead of reading current directly.
+    async function ensureLoaded(): Promise<Workspace | null> {
+        if (current.value) return current.value
+        if (!loadPromise) {
+            loadPromise = fetchAll().finally(() => { loadPromise = null })
+        }
+        await loadPromise
+        return current.value
+    }
+
     async function create(payload: { name: string; marketplace?: string; currency?: string }): Promise<Workspace> {
         const { data } = await api.post('/workspaces', payload)
         const ws = data.data ?? data
@@ -32,5 +49,5 @@ export const useWorkspaceStore = defineStore('workspace', () => {
         current.value = workspace
     }
 
-    return { workspaces, current, loading, fetchAll, create, setCurrent }
+    return { workspaces, current, loading, fetchAll, ensureLoaded, create, setCurrent }
 })

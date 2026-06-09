@@ -27,7 +27,9 @@ const lightboxUrl     = ref<string | null>(null)
 import api from '@/api/axios'
 
 onMounted(async () => {
-    const wsId = workspaceStore.current?.id
+    // On hard refresh the workspace may not be loaded yet — await it.
+    const ws = await workspaceStore.ensureLoaded()
+    const wsId = ws?.id
     const id   = route.params.id as string  // UUID
     if (!wsId || !id) return
     await productsStore.fetchOne(wsId, id)
