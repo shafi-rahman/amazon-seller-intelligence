@@ -207,11 +207,17 @@ class AIRouter
         ];
 
         // Nemotron reasoning model extras.
-        // JSON/structured tasks need a SMALL reasoning budget (256-512) so the model
-        // has tokens left for its actual output. Deep analysis tasks use the full budget.
-        if (config('ai.providers.nvidia.enable_thinking', true)) {
+        // Structured-output tasks (JSON for SEO/listing) are MORE reliable with
+        // thinking DISABLED: the <think> phase competes with the answer for the
+        // token budget and frequently produces empty or truncated JSON. Turning
+        // it off lets the full max_tokens budget go to the actual JSON output.
+        // Analysis tasks still benefit from reasoning, so they keep it on.
+        $structuredTasks = ['listing', 'seo', 'json'];
+
+        if (in_array($taskType, $structuredTasks, true)) {
+            $payload['chat_template_kwargs'] = ['enable_thinking' => false];
+        } elseif (config('ai.providers.nvidia.enable_thinking', true)) {
             $reasoningBudget = match ($taskType) {
-                'listing', 'seo', 'json' => 256,   // small: JSON output needs output tokens
                 'financial', 'competitor' => 2048,  // medium: moderate analysis
                 default                  => config('ai.providers.nvidia.reasoning_budget', 16384),
             };

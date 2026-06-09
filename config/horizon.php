@@ -199,15 +199,19 @@ return [
     'defaults' => [
         'supervisor-1' => [
             'connection' => 'redis',
-            'queue' => ['default'],
+            // All application queues, highest priority first. Horizon must watch
+            // every queue jobs are dispatched to — otherwise those jobs sit
+            // unprocessed forever (SEO 'ai' jobs, reconciliation, imports, etc.).
+            'queue' => ['imports', 'reconciliation', 'ai', 'reports', 'embeddings', 'default'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'maxProcesses' => 1,
             'maxTime' => 0,
             'maxJobs' => 0,
-            'memory' => 128,
-            'tries' => 1,
-            'timeout' => 60,
+            'memory' => 256,
+            'tries' => 2,
+            // AI/NVIDIA reasoning calls and report generation can be slow.
+            'timeout' => 300,
             'nice' => 0,
         ],
     ],

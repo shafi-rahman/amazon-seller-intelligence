@@ -48,12 +48,23 @@ class SeoContentService
 
         $postsData = [];
         foreach ($platforms as $platform => $generator) {
-            try {
-                $postsData[$platform] = $generator();
-            } catch (\Throwable $e) {
-                Log::warning("SEO content failed for {$platform}", ['error' => $e->getMessage()]);
-                $postsData[$platform] = ['caption' => null, 'hashtags' => null, 'image_prompt' => null];
+            // The NVIDIA Nemotron reasoning model is non-deterministic and
+            // occasionally returns an empty/truncated response. Retry up to 3
+            // times until we get a non-empty caption before giving up.
+            $data = ['caption' => null, 'hashtags' => null, 'image_prompt' => null];
+            for ($attempt = 1; $attempt <= 3; $attempt++) {
+                try {
+                    $result = $generator();
+                    if (!empty(trim((string) ($result['caption'] ?? '')))) {
+                        $data = $result;
+                        break;
+                    }
+                    Log::warning("SEO content empty for {$platform}, retrying", ['attempt' => $attempt]);
+                } catch (\Throwable $e) {
+                    Log::warning("SEO content failed for {$platform}", ['attempt' => $attempt, 'error' => $e->getMessage()]);
+                }
             }
+            $postsData[$platform] = $data;
         }
 
         // Step 4: Save posts
@@ -119,7 +130,7 @@ PROMPT;
                 ['role' => 'user', 'content' => $prompt],
             ],
             'seo',   // small reasoning budget for structured JSON output
-            1024,
+            1500,
         );
 
         return $this->parseJson($result['content'], [
@@ -169,11 +180,13 @@ PROMPT;
                 ['role' => 'user', 'content' => $prompt],
             ],
             'seo',
-            1024,
+            2048,   // caption + 10 hashtags + image_prompt needs room after reasoning
         );
 
         return $this->parseJson($result['content'], ['caption' => '', 'hashtags' => '', 'image_prompt' => '']);
     }
+
+    // NOTE: image_prompt above is consumed by the Phase 3 NVIDIA image generator.
 
     private function generateFacebook(array $ctx): array
     {
@@ -208,7 +221,7 @@ PROMPT;
                 ['role' => 'user', 'content' => $prompt],
             ],
             'seo',
-            1500,
+            2048,
         );
 
         return $this->parseJson($result['content'], ['caption' => '']);
@@ -240,9 +253,12 @@ Return ONLY valid JSON:
 PROMPT;
 
         $result = $this->router->chat(
-            [['role' => 'user', 'content' => $prompt]],
-            'general',
-            1500,
+            [
+                ['role' => 'system', 'content' => self::JSON_SYSTEM],
+                ['role' => 'user', 'content' => $prompt],
+            ],
+            'seo',   // was 'general' → 16384 reasoning budget ate all tokens, leaving no JSON output
+            2500,    // LinkedIn posts are 300-400 words — needs ample output room
         );
 
         return $this->parseJson($result['content'], ['caption' => '', 'hashtags' => '']);
@@ -276,7 +292,7 @@ PROMPT;
                 ['role' => 'user', 'content' => $prompt],
             ],
             'seo',
-            512,
+            1500,   // was 512 — left too little room after reasoning, truncating JSON
         );
 
         return $this->parseJson($result['content'], ['caption' => '']);
@@ -313,6 +329,20 @@ PROMPT;
             if (json_last_error() === JSON_ERROR_NONE) {
                 return $decoded;
             }
+        }
+
+        // Fallback: the response may have been truncated before the closing brace.
+        // Try to salvage individual string fields (caption/hashtags/image_prompt)
+        // so a partial generation still produces usable content.
+        $salvaged = [];
+        foreach (array_keys($fallback) as $key) {
+            if (preg_match('/"' . preg_quote($key, '/') . '"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/s', $text, $fm)) {
+                $salvaged[$key] = stripcslashes($fm[1]);
+            }
+        }
+        if (!empty($salvaged['caption'])) {
+            Log::info('SEO content JSON salvaged from truncated response', ['keys' => array_keys($salvaged)]);
+            return array_merge($fallback, $salvaged);
         }
 
         Log::warning('SEO content JSON parse failed', ['raw' => substr($text, 0, 300)]);

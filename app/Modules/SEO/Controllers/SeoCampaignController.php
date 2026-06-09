@@ -17,13 +17,13 @@ class SeoCampaignController extends Controller
 {
     use ApiResponse;
 
-    // POST /workspaces/{workspaceId}/products/{productId}/seo/tag
-    public function tag(Request $request, int $workspaceId, int $productId): JsonResponse
+    // POST /workspaces/{workspaceId}/products/{productId}/seo/tag  (productId = UUID)
+    public function tag(Request $request, int $workspaceId, string $productId): JsonResponse
     {
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
 
-        $product = Product::where('workspace_id', $workspaceId)->findOrFail($productId);
+        $product = Product::findByPublicId($productId, $workspace->id);
 
         // Prevent duplicate active campaigns
         $active = SeoCampaign::where('product_id', $product->id)
