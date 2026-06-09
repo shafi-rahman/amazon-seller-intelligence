@@ -46,6 +46,16 @@ class Product extends Model
         return $this->hasMany(\App\Modules\Competitors\Models\Competitor::class);
     }
 
+    public function images(): HasMany
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('display_order');
+    }
+
+    public function primaryImage(): HasMany
+    {
+        return $this->hasMany(ProductImage::class)->where('is_primary', true)->limit(1);
+    }
+
     public function keywords(): HasMany
     {
         return $this->hasMany(ProductKeyword::class);

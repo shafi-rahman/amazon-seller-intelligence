@@ -11,8 +11,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('workspaces/{workspaceId}/products/{product}/rewrite',       [ProductController::class, 'rewrite']);
     Route::post('workspaces/{workspaceId}/products/{product}/apply-rewrite', [ProductController::class, 'applyRewrite']);
 
-    // Product image management
-    Route::post('workspaces/{workspaceId}/products/{product}/image',     [ProductController::class, 'uploadImage']);
-    Route::delete('workspaces/{workspaceId}/products/{product}/image',   [ProductController::class, 'deleteImage']);
-    Route::get('workspaces/{workspaceId}/products/{product}/image-url',  [ProductController::class, 'imageUrl']);
+    // Product image gallery — multiple images
+    Route::get('workspaces/{workspaceId}/products/{product}/images',                   [ProductController::class, 'listImages']);
+    Route::post('workspaces/{workspaceId}/products/{product}/images',                  [ProductController::class, 'uploadImages']);
+    Route::delete('workspaces/{workspaceId}/products/{product}/images/{imageId}',      [ProductController::class, 'deleteProductImage']);
+    Route::put('workspaces/{workspaceId}/products/{product}/images/{imageId}/primary', [ProductController::class, 'setPrimaryImage']);
+    Route::put('workspaces/{workspaceId}/products/{product}/images/reorder',           [ProductController::class, 'reorderImages']);
 });

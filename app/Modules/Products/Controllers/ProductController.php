@@ -5,6 +5,7 @@ namespace App\Modules\Products\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Products\Jobs\AnalyzeProductJob;
 use App\Modules\Products\Models\Product;
+use App\Modules\Products\Models\ProductImage;
 use App\Modules\Products\Resources\ProductDetailResource;
 use App\Modules\Products\Resources\ProductResource;
 use App\Modules\Products\Services\ProductIntelligenceService;
@@ -13,6 +14,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
@@ -64,7 +66,10 @@ class ProductController extends Controller
         abort_unless($workspace->hasMember($request->user()), 403);
         abort_unless($product->workspace_id === $workspaceId, 404);
 
-        $product->load(['keywords' => fn($q) => $q->orderByDesc('frequency')->limit(50)]);
+        $product->load([
+            'keywords' => fn($q) => $q->orderByDesc('frequency')->limit(50),
+            'images',
+        ]);
 
         return $this->success(new ProductDetailResource($product));
     }
@@ -123,68 +128,150 @@ class ProductController extends Controller
 
         $updated = $this->intelligence->applyRewrite($product, $validated);
 
-        return $this->success(new ProductDetailResource($updated->load('keywords')));
+        return $this->success(new ProductDetailResource($updated->load(['keywords', 'images'])));
     }
 
-    // POST /workspaces/{id}/products/{product}/image
-    public function uploadImage(Request $request, int $workspaceId, Product $product): JsonResponse
+    // POST /workspaces/{id}/products/{product}/images  (multiple files)
+    public function uploadImages(Request $request, int $workspaceId, Product $product): JsonResponse
     {
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
         abort_unless($product->workspace_id === $workspaceId, 404);
 
         $request->validate([
-            'image' => ['required', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
+            'images'          => ['required', 'array', 'min:1', 'max:10'],
+            'images.*'        => ['image', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
         ]);
 
-        // Delete old image if exists
-        if ($product->image_path) {
-            Storage::disk('s3')->delete($product->image_path);
+        $nextOrder  = $product->images()->max('display_order') ?? -1;
+        $isFirstEver = $product->images()->count() === 0;
+        $uploaded   = [];
+
+        foreach ($request->file('images') as $file) {
+            $nextOrder++;
+            $uuid      = (string) Str::uuid();
+            $ext       = $file->getClientOriginalExtension();
+            $path      = "asip-uploads/products/{$workspaceId}/{$product->public_id}/{$uuid}.{$ext}";
+
+            Storage::disk('s3')->put($path, $file->get());
+
+            $isPrimary = ($isFirstEver && $nextOrder === 0);
+
+            $image = ProductImage::create([
+                'product_id'    => $product->id,
+                'workspace_id'  => $workspaceId,
+                'storage_path'  => $path,
+                'file_name'     => $file->getClientOriginalName(),
+                'display_order' => $nextOrder,
+                'is_primary'    => $isPrimary,
+            ]);
+
+            // Keep products.image_path synced with primary image
+            if ($isPrimary) {
+                $product->update(['image_path' => $path]);
+            }
+
+            $uploaded[] = [
+                'id'            => $image->public_id,
+                'url'           => $image->url(),
+                'file_name'     => $image->file_name,
+                'display_order' => $image->display_order,
+                'is_primary'    => $image->is_primary,
+            ];
         }
 
-        $file      = $request->file('image');
-        $ext       = $file->getClientOriginalExtension();
-        $path      = "asip-uploads/products/{$workspaceId}/{$product->public_id}/product.{$ext}";
-
-        Storage::disk('s3')->put($path, $file->get(), 'public');
-
-        $product->update(['image_path' => $path]);
-
-        return $this->success([
-            'image_path' => $path,
-            'image_url'  => Storage::disk('s3')->temporaryUrl($path, now()->addHours(24)),
-        ]);
+        return $this->success(['uploaded' => $uploaded, 'count' => count($uploaded)], 201);
     }
 
-    // DELETE /workspaces/{id}/products/{product}/image
-    public function deleteImage(Request $request, int $workspaceId, Product $product): JsonResponse
+    // DELETE /workspaces/{id}/products/{product}/images/{imagePublicId}
+    public function deleteProductImage(Request $request, int $workspaceId, Product $product, string $imageId): JsonResponse
     {
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
         abort_unless($product->workspace_id === $workspaceId, 404);
 
-        if ($product->image_path) {
-            Storage::disk('s3')->delete($product->image_path);
-            $product->update(['image_path' => null]);
+        $image = ProductImage::where('product_id', $product->id)
+            ->where('public_id', $imageId)
+            ->firstOrFail();
+
+        $wasPrimary = $image->is_primary;
+        $image->deleteFromStorage();
+        $image->delete();
+
+        // Reorder remaining images
+        $product->images()->orderBy('display_order')->each(function ($img, $i) {
+            $img->update(['display_order' => $i]);
+        });
+
+        // If primary was deleted, promote next image
+        if ($wasPrimary) {
+            $next = $product->images()->orderBy('display_order')->first();
+            if ($next) {
+                $next->update(['is_primary' => true]);
+                $product->update(['image_path' => $next->storage_path]);
+            } else {
+                $product->update(['image_path' => null]);
+            }
         }
 
         return $this->noContent();
     }
 
-    // GET /workspaces/{id}/products/{product}/image-url
-    // Returns a fresh presigned URL for the product image
-    public function imageUrl(Request $request, int $workspaceId, Product $product): JsonResponse
+    // PUT /workspaces/{id}/products/{product}/images/{imagePublicId}/primary
+    public function setPrimaryImage(Request $request, int $workspaceId, Product $product, string $imageId): JsonResponse
     {
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
         abort_unless($product->workspace_id === $workspaceId, 404);
 
-        if (!$product->image_path) {
-            return $this->success(['image_url' => null]);
+        $image = ProductImage::where('product_id', $product->id)
+            ->where('public_id', $imageId)
+            ->firstOrFail();
+
+        // Unset all primaries, then set this one
+        ProductImage::where('product_id', $product->id)->update(['is_primary' => false]);
+        $image->update(['is_primary' => true]);
+        $product->update(['image_path' => $image->storage_path]);
+
+        return $this->success(['id' => $imageId, 'is_primary' => true]);
+    }
+
+    // PUT /workspaces/{id}/products/{product}/images/reorder
+    public function reorderImages(Request $request, int $workspaceId, Product $product): JsonResponse
+    {
+        $workspace = Workspace::findOrFail($workspaceId);
+        abort_unless($workspace->hasMember($request->user()), 403);
+        abort_unless($product->workspace_id === $workspaceId, 404);
+
+        $validated = $request->validate([
+            'order'   => ['required', 'array'],
+            'order.*' => ['string'], // array of public_ids in new order
+        ]);
+
+        foreach ($validated['order'] as $index => $publicId) {
+            ProductImage::where('product_id', $product->id)
+                ->where('public_id', $publicId)
+                ->update(['display_order' => $index]);
         }
 
-        return $this->success([
-            'image_url' => Storage::disk('s3')->temporaryUrl($product->image_path, now()->addHours(24)),
+        return $this->success(['reordered' => true]);
+    }
+
+    // GET /workspaces/{id}/products/{product}/images
+    public function listImages(Request $request, int $workspaceId, Product $product): JsonResponse
+    {
+        $workspace = Workspace::findOrFail($workspaceId);
+        abort_unless($workspace->hasMember($request->user()), 403);
+        abort_unless($product->workspace_id === $workspaceId, 404);
+
+        $images = $product->images()->get()->map(fn($img) => [
+            'id'            => $img->public_id,
+            'url'           => $img->url(),
+            'file_name'     => $img->file_name,
+            'display_order' => $img->display_order,
+            'is_primary'    => $img->is_primary,
         ]);
+
+        return $this->success($images);
     }
 }

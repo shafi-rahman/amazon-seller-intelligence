@@ -32,10 +32,21 @@ class ProductDetailResource extends JsonResource
             'review_count'     => $this->review_count,
             'listing_score'    => $this->listing_score,
             'last_analyzed_at' => $this->last_analyzed_at?->toISOString(),
-            'image_path'       => $this->image_path,
-            'image_url'        => $this->image_path
-                ? \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($this->image_path, now()->addHours(24))
-                : null,
+            // Image gallery
+            'images'     => $this->whenLoaded('images', fn() =>
+                $this->images->map(fn($img) => [
+                    'id'            => $img->public_id,
+                    'url'           => $img->url(),
+                    'file_name'     => $img->file_name,
+                    'display_order' => $img->display_order,
+                    'is_primary'    => $img->is_primary,
+                ])
+            ),
+            // Primary image URL (for backward compat / quick access)
+            'image_url'  => $this->whenLoaded('images', fn() =>
+                $this->images->firstWhere('is_primary', true)?->url() ??
+                $this->images->first()?->url()
+            ),
 
             // Score breakdown from latest analysis
             'score_breakdown' => $scoredAnalysis?->analysis_data,

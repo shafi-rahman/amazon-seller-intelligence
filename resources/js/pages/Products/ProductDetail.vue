@@ -18,11 +18,12 @@ const analyzing    = ref(false)
 const applyingRewrite = ref(false)
 const editedRewrite = ref<Record<string, string>>({})
 
-// Image management
-const imageUploading = ref(false)
-const imageDeleting  = ref(false)
-const imagePreview   = ref<string | null>(null)
-const fileInputRef   = ref<HTMLInputElement | null>(null)
+// Image gallery
+const imageUploading  = ref(false)
+const deletingImageId = ref<string | null>(null)
+const settingPrimary  = ref<string | null>(null)
+const fileInputRef    = ref<HTMLInputElement | null>(null)
+const lightboxUrl     = ref<string | null>(null)
 import api from '@/api/axios'
 
 onMounted(async () => {
@@ -48,61 +49,73 @@ async function doSeo() {
     }
 }
 
-async function uploadImage(event: Event) {
+// Gallery: computed images list
+const galleryImages = computed(() => product.value?.images ?? [])
+const primaryImageUrl = computed(() =>
+    galleryImages.value.find((i: any) => i.is_primary)?.url ??
+    galleryImages.value[0]?.url ?? null
+)
+
+async function uploadImages(event: Event) {
     const wsId = workspaceStore.current?.id
     if (!wsId || !product.value) return
-    const file = (event.target as HTMLInputElement).files?.[0]
-    if (!file) return
-
-    // Show local preview immediately
-    const reader = new FileReader()
-    reader.onload = (e) => { imagePreview.value = e.target?.result as string }
-    reader.readAsDataURL(file)
+    const files = (event.target as HTMLInputElement).files
+    if (!files || files.length === 0) return
 
     imageUploading.value = true
+    const form = new FormData()
+    Array.from(files).forEach(f => form.append('images[]', f))
+
     try {
-        const form = new FormData()
-        form.append('image', file)
-        const { data } = await api.post(
-            `/workspaces/${wsId}/products/${product.value.id}/image`,
+        await api.post(
+            `/workspaces/${wsId}/products/${product.value.id}/images`,
             form,
             { headers: { 'Content-Type': 'multipart/form-data' } }
         )
-        // Update the product with new image URL
-        if (productsStore.current) {
-            productsStore.current.image_url = (data.data ?? data).image_url
-            productsStore.current.image_path = (data.data ?? data).image_path
-        }
-        imagePreview.value = (data.data ?? data).image_url
-        toast.success('Product image uploaded!')
+        // Reload product to get fresh images list
+        await productsStore.fetchOne(wsId, product.value.id)
+        toast.success(`${files.length} image${files.length > 1 ? 's' : ''} uploaded!`)
     } catch {
-        toast.error('Image upload failed. Max 5MB, JPG/PNG/WebP only.')
-        imagePreview.value = null
+        toast.error('Upload failed. Max 5MB each, JPG/PNG/WebP only.')
     } finally {
         imageUploading.value = false
+        if (fileInputRef.value) fileInputRef.value.value = ''
     }
 }
 
-async function deleteImage() {
+async function deleteImage(imageId: string) {
     const wsId = workspaceStore.current?.id
     if (!wsId || !product.value) return
-    imageDeleting.value = true
+    deletingImageId.value = imageId
     try {
-        await api.delete(`/workspaces/${wsId}/products/${product.value.id}/image`)
-        if (productsStore.current) {
-            productsStore.current.image_url  = null
-            productsStore.current.image_path = null
+        await api.delete(`/workspaces/${wsId}/products/${product.value.id}/images/${imageId}`)
+        if (productsStore.current?.images) {
+            productsStore.current.images = productsStore.current.images.filter((i: any) => i.id !== imageId)
         }
-        imagePreview.value = null
         toast.success('Image removed')
     } catch {
         toast.error('Failed to remove image')
     } finally {
-        imageDeleting.value = false
+        deletingImageId.value = null
     }
 }
 
-const currentImageUrl = computed(() => imagePreview.value ?? product.value?.image_url ?? null)
+async function setPrimary(imageId: string) {
+    const wsId = workspaceStore.current?.id
+    if (!wsId || !product.value) return
+    settingPrimary.value = imageId
+    try {
+        await api.put(`/workspaces/${wsId}/products/${product.value.id}/images/${imageId}/primary`)
+        if (productsStore.current?.images) {
+            productsStore.current.images.forEach((i: any) => { i.is_primary = i.id === imageId })
+        }
+        toast.success('Primary image updated')
+    } catch {
+        toast.error('Failed to set primary image')
+    } finally {
+        settingPrimary.value = null
+    }
+}
 
 async function runAnalysis() {
     const wsId = workspaceStore.current?.id
@@ -161,8 +174,8 @@ function barColor(score: number, max: number) {
             <RouterLink to="/products" class="text-sm text-indigo-600 hover:underline flex-shrink-0 mt-1">← Products</RouterLink>
             <span class="text-gray-300 flex-shrink-0 mt-1">|</span>
             <!-- Product image thumbnail in header -->
-            <div v-if="product && currentImageUrl" class="flex-shrink-0 mt-0.5">
-                <img :src="currentImageUrl" alt="" class="w-10 h-10 rounded-lg object-cover border border-gray-200" />
+            <div v-if="product && primaryImageUrl" class="flex-shrink-0 mt-0.5">
+                <img :src="primaryImageUrl" alt="" class="w-10 h-10 rounded-lg object-cover border border-gray-200" />
             </div>
             <div v-else-if="product" class="flex-shrink-0 mt-0.5">
                 <button @click="activeTab = 'image'"
@@ -367,95 +380,113 @@ function barColor(score: number, max: number) {
                 </div>
             </div>
 
-            <!-- Tab: Images -->
+            <!-- Tab: Images (multiple) -->
             <div v-else-if="activeTab === 'image'" class="bg-white rounded-lg border border-gray-200 p-6">
+
+                <!-- Header + Upload button -->
                 <div class="flex items-center justify-between mb-5">
                     <div>
-                        <h3 class="text-base font-semibold text-gray-900">Product Image</h3>
+                        <h3 class="text-base font-semibold text-gray-900">Product Images</h3>
                         <p class="text-xs text-gray-500 mt-0.5">
-                            Upload your main product image. Used for SEO campaigns (Instagram, Facebook posts).
+                            {{ galleryImages.length }} image{{ galleryImages.length !== 1 ? 's' : '' }} uploaded ·
+                            First image is primary (used in SEO campaigns) · Max 10 images, 5MB each
                         </p>
                     </div>
+                    <div class="flex items-center gap-2">
+                        <input ref="fileInputRef" type="file" accept="image/jpeg,image/png,image/webp"
+                            multiple class="hidden" @change="uploadImages" />
+                        <button @click="fileInputRef?.click()" :disabled="imageUploading"
+                            class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                            <svg v-if="!imageUploading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            <svg v-else class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                            </svg>
+                            {{ imageUploading ? 'Uploading…' : 'Upload Images' }}
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Image preview / upload area -->
-                <div class="flex gap-6 items-start">
-                    <!-- Current image or placeholder -->
-                    <div class="flex-shrink-0">
-                        <div v-if="currentImageUrl"
-                            class="w-48 h-48 rounded-xl overflow-hidden border-2 border-gray-200 bg-gray-50 relative group">
-                            <img :src="currentImageUrl" alt="Product image"
-                                class="w-full h-full object-cover" />
-                            <!-- Overlay with remove button -->
-                            <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <button @click="deleteImage" :disabled="imageDeleting"
-                                    class="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors">
-                                    {{ imageDeleting ? 'Removing…' : '🗑 Remove' }}
-                                </button>
-                            </div>
+                <!-- Empty state -->
+                <div v-if="galleryImages.length === 0"
+                    class="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
+                    @click="fileInputRef?.click()">
+                    <svg class="w-14 h-14 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p class="text-sm font-medium text-gray-600 mb-1">Click to upload product images</p>
+                    <p class="text-xs text-gray-400">Select multiple images at once · JPG, PNG, WebP · Max 5MB each</p>
+                </div>
+
+                <!-- Image gallery grid -->
+                <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    <div v-for="(img, idx) in galleryImages" :key="img.id"
+                        class="relative group rounded-xl overflow-hidden border-2 transition-colors aspect-square"
+                        :class="img.is_primary ? 'border-indigo-500' : 'border-gray-200'">
+
+                        <!-- Image -->
+                        <img :src="img.url" :alt="`Product image ${idx + 1}`"
+                            class="w-full h-full object-cover cursor-pointer"
+                            @click="lightboxUrl = img.url" />
+
+                        <!-- Primary badge -->
+                        <div v-if="img.is_primary"
+                            class="absolute top-1.5 left-1.5 bg-indigo-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-md">
+                            PRIMARY
                         </div>
-                        <div v-else
-                            class="w-48 h-48 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
-                            @click="fileInputRef?.click()">
-                            <svg class="w-12 h-12 mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span class="text-xs font-medium">Click to upload</span>
-                            <span class="text-xs mt-0.5">JPG, PNG, WebP</span>
-                        </div>
-                    </div>
 
-                    <!-- Upload controls and info -->
-                    <div class="flex-1">
-                        <div class="space-y-4">
-                            <!-- Upload button -->
-                            <div>
-                                <input ref="fileInputRef" type="file" accept="image/jpeg,image/png,image/webp"
-                                    class="hidden" @change="uploadImage" />
-                                <button @click="fileInputRef?.click()" :disabled="imageUploading"
-                                    class="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                                    <svg v-if="!imageUploading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                    </svg>
-                                    <svg v-else class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                    </svg>
-                                    {{ imageUploading ? 'Uploading…' : (currentImageUrl ? 'Replace Image' : 'Upload Image') }}
-                                </button>
-                            </div>
-
-                            <!-- Requirements -->
-                            <div class="bg-gray-50 rounded-lg p-4 text-xs text-gray-600 space-y-1">
-                                <p class="font-semibold text-gray-700 mb-2">Image requirements</p>
-                                <p>• Max file size: <strong>5 MB</strong></p>
-                                <p>• Formats: <strong>JPG, PNG, WebP</strong></p>
-                                <p>• Recommended: <strong>1000×1000px</strong> or larger (square)</p>
-                                <p>• White or clean background works best for social media</p>
-                            </div>
-
-                            <!-- Usage note -->
-                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
-                                <strong>📸 Used in SEO Campaigns:</strong> This image is automatically attached to
-                                your Instagram and Facebook posts when you run an SEO campaign on this product.
-                                Phase 3 will add AI image generation using NVIDIA.
-                            </div>
-
-                            <!-- Remove button (if image exists) -->
-                            <div v-if="currentImageUrl">
-                                <button @click="deleteImage" :disabled="imageDeleting"
-                                    class="text-xs text-red-600 hover:text-red-700 flex items-center gap-1 transition-colors disabled:opacity-50">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                    {{ imageDeleting ? 'Removing…' : 'Remove image' }}
-                                </button>
-                            </div>
+                        <!-- Hover overlay with actions -->
+                        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                            <!-- Set primary button -->
+                            <button v-if="!img.is_primary"
+                                @click.stop="setPrimary(img.id)"
+                                :disabled="settingPrimary === img.id"
+                                class="px-2 py-1 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50 w-24 text-center">
+                                {{ settingPrimary === img.id ? '…' : '⭐ Set Primary' }}
+                            </button>
+                            <!-- Delete button -->
+                            <button @click.stop="deleteImage(img.id)"
+                                :disabled="deletingImageId === img.id"
+                                class="px-2 py-1 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 disabled:opacity-50 w-24 text-center">
+                                {{ deletingImageId === img.id ? '…' : '🗑 Remove' }}
+                            </button>
                         </div>
                     </div>
+
+                    <!-- Add more slot -->
+                    <div v-if="galleryImages.length < 10"
+                        class="aspect-square rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
+                        @click="fileInputRef?.click()">
+                        <svg class="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span class="text-xs">Add more</span>
+                    </div>
+                </div>
+
+                <!-- Instructions -->
+                <div class="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+                    <strong>📸 SEO Campaigns:</strong> The <span class="font-semibold">PRIMARY</span> image is automatically used
+                    for Instagram and Facebook posts. Click any image to enlarge. Hover to set primary or remove.
                 </div>
             </div>
+
+            <!-- Lightbox -->
+            <Teleport to="body">
+                <div v-if="lightboxUrl" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+                    @click="lightboxUrl = null">
+                    <img :src="lightboxUrl" alt="Product image"
+                        class="max-w-full max-h-full rounded-xl object-contain shadow-2xl"
+                        @click.stop />
+                    <button @click="lightboxUrl = null"
+                        class="absolute top-4 right-4 w-10 h-10 bg-white/10 text-white rounded-full flex items-center justify-center hover:bg-white/20 transition-colors text-lg">
+                        ✕
+                    </button>
+                </div>
+            </Teleport>
         </div>
     </div>
 </template>
