@@ -8,10 +8,13 @@ use App\Modules\SEO\Jobs\RunSeoAgentJob;
 use App\Modules\SEO\Models\SeoCampaign;
 use App\Modules\SEO\Models\SeoPost;
 use App\Modules\SEO\Resources\SeoCampaignResource;
+use App\Modules\SEO\Services\SeoImageService;
 use App\Modules\Workspace\Models\Workspace;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class SeoCampaignController extends Controller
 {
@@ -116,6 +119,99 @@ class SeoCampaignController extends Controller
         $post->update(['status' => 'rejected']);
 
         return $this->success(['post_id' => $post->id, 'status' => 'rejected']);
+    }
+
+    // Authorize a post belongs to a workspace the user can access; returns the post.
+    private function authorizePost(Request $request, int $postId): SeoPost
+    {
+        $post = SeoPost::with('campaign')->findOrFail($postId);
+        $workspace = Workspace::findOrFail($post->campaign->workspace_id);
+        abort_unless($workspace->hasMember($request->user()), 403);
+        return $post;
+    }
+
+    // PUT /seo/posts/{postId}  — edit all content fields (title, caption, hashtags)
+    public function updatePost(Request $request, int $postId): JsonResponse
+    {
+        $post = $this->authorizePost($request, $postId);
+
+        $validated = $request->validate([
+            'title'    => ['sometimes', 'nullable', 'string', 'max:300'],
+            'caption'  => ['sometimes', 'nullable', 'string'],
+            'hashtags' => ['sometimes', 'nullable', 'string', 'max:1000'],
+        ]);
+
+        // The caption edit lives in edited_caption so the original AI copy is preserved.
+        $update = [];
+        if (array_key_exists('title', $validated))    $update['title']          = $validated['title'];
+        if (array_key_exists('caption', $validated))  $update['edited_caption'] = $validated['caption'];
+        if (array_key_exists('hashtags', $validated)) $update['hashtags']       = $validated['hashtags'];
+
+        $post->update($update);
+
+        return $this->success([
+            'post_id'        => $post->id,
+            'title'          => $post->title,
+            'edited_caption' => $post->edited_caption,
+            'hashtags'       => $post->hashtags,
+            'image_url'      => $post->imageUrl(),
+        ]);
+    }
+
+    // POST /seo/posts/{postId}/image/upload  — upload an image from the user's computer
+    public function uploadPostImage(Request $request, int $postId): JsonResponse
+    {
+        $post = $this->authorizePost($request, $postId);
+
+        $request->validate([
+            'image' => ['required', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
+        ]);
+
+        // Remove a previously AI-generated/uploaded image for this post if it was
+        // unique to this post (not the shared campaign image used by siblings).
+        $wsId = $post->campaign->workspace_id;
+        $file = $request->file('image');
+        $path = "seo/{$wsId}/{$post->campaign->public_id}/upload-" . Str::uuid() . '.' . $file->getClientOriginalExtension();
+
+        Storage::disk('s3')->put($path, $file->get());
+        $post->update(['image_path' => $path]);
+
+        return $this->success([
+            'post_id'   => $post->id,
+            'image_url' => $post->imageUrl(),
+        ]);
+    }
+
+    // POST /seo/posts/{postId}/image/generate  — (re)generate the image via NVIDIA FLUX,
+    // optionally guided by a user-supplied reference prompt.
+    public function regeneratePostImage(Request $request, int $postId, SeoImageService $imageService): JsonResponse
+    {
+        $post = $this->authorizePost($request, $postId);
+
+        $validated = $request->validate([
+            'prompt' => ['sometimes', 'nullable', 'string', 'max:1000'],
+        ]);
+
+        // User reference prompt takes priority; fall back to the post's stored prompt.
+        $prompt = trim((string) ($validated['prompt'] ?? '')) ?: ($post->image_prompt ?? '');
+        abort_if($prompt === '', 422, 'Provide a prompt describing the image you want.');
+
+        $wsId = $post->campaign->workspace_id;
+        $path = $imageService->generate($prompt, $wsId, $post->campaign->public_id);
+
+        abort_if(!$path, 502, 'Image generation failed. Please try again in a moment.');
+
+        // Persist the prompt the user gave so it shows next time, and the new image.
+        $post->update([
+            'image_path'   => $path,
+            'image_prompt' => $prompt,
+        ]);
+
+        return $this->success([
+            'post_id'      => $post->id,
+            'image_url'    => $post->imageUrl(),
+            'image_prompt' => $post->image_prompt,
+        ]);
     }
 
     // GET /seo/campaigns/{uuid}/product-data  (for OpenClaw skill)

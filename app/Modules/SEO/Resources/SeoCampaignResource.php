@@ -38,6 +38,7 @@ class SeoCampaignResource extends JsonResource
                 $this->posts->map(fn($p) => [
                     'id'             => $p->id,
                     'platform'       => $p->platform,
+                    'title'          => $p->title,
                     'caption'        => $p->caption,
                     'edited_caption' => $p->edited_caption,
                     'hashtags'       => $p->hashtags,

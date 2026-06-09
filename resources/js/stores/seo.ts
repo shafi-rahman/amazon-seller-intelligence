@@ -5,6 +5,7 @@ import api from '@/api/axios'
 export interface SeoPost {
     id: number
     platform: 'instagram' | 'facebook' | 'linkedin' | 'google_business'
+    title: string | null
     caption: string | null
     edited_caption: string | null
     hashtags: string | null
@@ -76,29 +77,61 @@ export const useSeoStore = defineStore('seo', () => {
         }
     }
 
+    function patchPost(postId: number, changes: Partial<SeoPost>): void {
+        const post = current.value?.posts?.find(p => p.id === postId)
+        if (post) Object.assign(post, changes)
+    }
+
     async function approvePost(postId: number, editedCaption?: string): Promise<void> {
-        await api.post(`/api/v1/seo/posts/${postId}/approve`, { edited_caption: editedCaption })
-        if (current.value?.posts) {
-            const post = current.value.posts.find(p => p.id === postId)
-            if (post) {
-                post.status = 'approved'
-                if (editedCaption) post.edited_caption = editedCaption
-                current.value.approved_count++
-            }
+        await api.post(`/seo/posts/${postId}/approve`, { edited_caption: editedCaption })
+        const post = current.value?.posts?.find(p => p.id === postId)
+        if (post) {
+            post.status = 'approved'
+            if (editedCaption) post.edited_caption = editedCaption
+            if (current.value) current.value.approved_count++
         }
     }
 
     async function rejectPost(postId: number): Promise<void> {
-        await api.post(`/api/v1/seo/posts/${postId}/reject`)
-        if (current.value?.posts) {
-            const post = current.value.posts.find(p => p.id === postId)
-            if (post) post.status = 'rejected'
-        }
+        await api.post(`/seo/posts/${postId}/reject`)
+        patchPost(postId, { status: 'rejected' })
+    }
+
+    // Edit any content field (title / caption / hashtags)
+    async function updatePost(
+        postId: number,
+        payload: { title?: string | null; caption?: string | null; hashtags?: string | null },
+    ): Promise<void> {
+        const { data } = await api.put(`/seo/posts/${postId}`, payload)
+        const d = data.data ?? data
+        patchPost(postId, {
+            title: d.title,
+            edited_caption: d.edited_caption,
+            hashtags: d.hashtags,
+        })
+    }
+
+    // Upload an image from the user's computer
+    async function uploadPostImage(postId: number, file: File): Promise<void> {
+        const form = new FormData()
+        form.append('image', file)
+        const { data } = await api.post(`/seo/posts/${postId}/image/upload`, form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        patchPost(postId, { image_url: (data.data ?? data).image_url })
+    }
+
+    // (Re)generate the AI image, optionally with a custom reference prompt
+    async function regeneratePostImage(postId: number, prompt?: string): Promise<void> {
+        const { data } = await api.post(`/seo/posts/${postId}/image/generate`, { prompt })
+        const d = data.data ?? data
+        patchPost(postId, { image_url: d.image_url, image_prompt: d.image_prompt })
     }
 
     return {
         campaigns, current, loading, tagging,
         PLATFORM_LABELS, PLATFORM_COLORS,
         fetchCampaigns, fetchCampaign, tagProduct, approvePost, rejectPost,
+        updatePost, uploadPostImage, regeneratePostImage,
     }
 })

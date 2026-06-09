@@ -21,6 +21,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Post-level approval actions
     Route::post('seo/posts/{postId}/approve', [SeoCampaignController::class, 'approvePost']);
     Route::post('seo/posts/{postId}/reject',  [SeoCampaignController::class, 'rejectPost']);
+
+    // Post-level content + image editing
+    Route::put('seo/posts/{postId}',                 [SeoCampaignController::class, 'updatePost']);
+    Route::post('seo/posts/{postId}/image/upload',   [SeoCampaignController::class, 'uploadPostImage']);
+    Route::post('seo/posts/{postId}/image/generate', [SeoCampaignController::class, 'regeneratePostImage']);
 });
 
 // Token-secured endpoints for OpenClaw skill (no session needed)

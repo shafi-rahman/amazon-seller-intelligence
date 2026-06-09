@@ -11,7 +11,7 @@ class SeoPost extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'campaign_id', 'platform', 'caption', 'edited_caption',
+        'campaign_id', 'platform', 'title', 'caption', 'edited_caption',
         'hashtags', 'image_prompt', 'image_path',
         'status', 'platform_post_id', 'published_at',
     ];
