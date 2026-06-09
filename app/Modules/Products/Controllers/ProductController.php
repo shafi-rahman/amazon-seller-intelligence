@@ -12,6 +12,7 @@ use App\Modules\Workspace\Models\Workspace;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
@@ -123,5 +124,67 @@ class ProductController extends Controller
         $updated = $this->intelligence->applyRewrite($product, $validated);
 
         return $this->success(new ProductDetailResource($updated->load('keywords')));
+    }
+
+    // POST /workspaces/{id}/products/{product}/image
+    public function uploadImage(Request $request, int $workspaceId, Product $product): JsonResponse
+    {
+        $workspace = Workspace::findOrFail($workspaceId);
+        abort_unless($workspace->hasMember($request->user()), 403);
+        abort_unless($product->workspace_id === $workspaceId, 404);
+
+        $request->validate([
+            'image' => ['required', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
+        ]);
+
+        // Delete old image if exists
+        if ($product->image_path) {
+            Storage::disk('s3')->delete($product->image_path);
+        }
+
+        $file      = $request->file('image');
+        $ext       = $file->getClientOriginalExtension();
+        $path      = "asip-uploads/products/{$workspaceId}/{$product->public_id}/product.{$ext}";
+
+        Storage::disk('s3')->put($path, $file->get(), 'public');
+
+        $product->update(['image_path' => $path]);
+
+        return $this->success([
+            'image_path' => $path,
+            'image_url'  => Storage::disk('s3')->temporaryUrl($path, now()->addHours(24)),
+        ]);
+    }
+
+    // DELETE /workspaces/{id}/products/{product}/image
+    public function deleteImage(Request $request, int $workspaceId, Product $product): JsonResponse
+    {
+        $workspace = Workspace::findOrFail($workspaceId);
+        abort_unless($workspace->hasMember($request->user()), 403);
+        abort_unless($product->workspace_id === $workspaceId, 404);
+
+        if ($product->image_path) {
+            Storage::disk('s3')->delete($product->image_path);
+            $product->update(['image_path' => null]);
+        }
+
+        return $this->noContent();
+    }
+
+    // GET /workspaces/{id}/products/{product}/image-url
+    // Returns a fresh presigned URL for the product image
+    public function imageUrl(Request $request, int $workspaceId, Product $product): JsonResponse
+    {
+        $workspace = Workspace::findOrFail($workspaceId);
+        abort_unless($workspace->hasMember($request->user()), 403);
+        abort_unless($product->workspace_id === $workspaceId, 404);
+
+        if (!$product->image_path) {
+            return $this->success(['image_url' => null]);
+        }
+
+        return $this->success([
+            'image_url' => Storage::disk('s3')->temporaryUrl($product->image_path, now()->addHours(24)),
+        ]);
     }
 }

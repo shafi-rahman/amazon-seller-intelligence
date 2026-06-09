@@ -32,6 +32,10 @@ class ProductDetailResource extends JsonResource
             'review_count'     => $this->review_count,
             'listing_score'    => $this->listing_score,
             'last_analyzed_at' => $this->last_analyzed_at?->toISOString(),
+            'image_path'       => $this->image_path,
+            'image_url'        => $this->image_path
+                ? \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($this->image_path, now()->addHours(24))
+                : null,
 
             // Score breakdown from latest analysis
             'score_breakdown' => $scoredAnalysis?->analysis_data,
