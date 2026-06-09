@@ -139,7 +139,7 @@ class ProductController extends Controller
         abort_unless($product->workspace_id === $workspaceId, 404);
 
         $request->validate([
-            'images'          => ['required', 'array', 'min:1', 'max:10'],
+            'images'          => ['required', 'array', 'min:1', 'max:20'],
             'images.*'        => ['image', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
         ]);
 
@@ -151,7 +151,7 @@ class ProductController extends Controller
             $nextOrder++;
             $uuid      = (string) Str::uuid();
             $ext       = $file->getClientOriginalExtension();
-            $path      = "asip-uploads/products/{$workspaceId}/{$product->public_id}/{$uuid}.{$ext}";
+            $path      = "products/{$workspaceId}/{$product->public_id}/{$uuid}.{$ext}";
 
             Storage::disk('s3')->put($path, $file->get());
 

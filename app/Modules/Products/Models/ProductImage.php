@@ -48,7 +48,8 @@ class ProductImage extends Model
     {
         if (!$this->storage_path) return null;
         try {
-            return Storage::disk('s3')->temporaryUrl(
+            // Sign with the browser-reachable endpoint (localhost:9000), not minio:9000
+            return Storage::disk('s3_public')->temporaryUrl(
                 $this->storage_path,
                 now()->addHours($ttlHours)
             );

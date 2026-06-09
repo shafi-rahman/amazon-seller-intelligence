@@ -175,7 +175,9 @@ function barColor(score: number, max: number) {
             <span class="text-gray-300 flex-shrink-0 mt-1">|</span>
             <!-- Product image thumbnail in header -->
             <div v-if="product && primaryImageUrl" class="flex-shrink-0 mt-0.5">
-                <img :src="primaryImageUrl" alt="" class="w-10 h-10 rounded-lg object-cover border border-gray-200" />
+                <img :src="primaryImageUrl" alt="" @click="activeTab = 'image'"
+                    title="View product images"
+                    class="w-10 h-10 rounded-lg object-cover border border-gray-200 cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all" />
             </div>
             <div v-else-if="product" class="flex-shrink-0 mt-0.5">
                 <button @click="activeTab = 'image'"
@@ -195,17 +197,34 @@ function barColor(score: number, max: number) {
         <div v-else>
             <!-- Header -->
             <div class="bg-white rounded-lg border border-gray-200 p-5 mb-4 flex items-start justify-between">
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-3 mb-2">
-                        <span class="font-mono text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{{ product.asin }}</span>
-                        <span v-if="product.sku" class="text-xs text-gray-400">SKU: {{ product.sku }}</span>
-                        <span v-if="product.brand" class="text-xs text-gray-500">{{ product.brand }}</span>
-                    </div>
-                    <h2 class="text-sm text-gray-700 leading-snug mb-2 line-clamp-2" :title="product.title">{{ product.title }}</h2>
-                    <div class="flex items-center gap-4 text-xs text-gray-500">
-                        <span v-if="product.price">₹{{ product.price?.toLocaleString('en-IN') }}</span>
-                        <span v-if="product.rating">{{ product.rating }}★ ({{ product.review_count }} reviews)</span>
-                        <span v-if="product.category">{{ product.category }}</span>
+                <div class="flex-1 min-w-0 flex gap-4">
+                    <!-- Product image (clickable → Images tab) -->
+                    <button @click="activeTab = 'image'" class="flex-shrink-0 group" title="View / manage product images">
+                        <div v-if="primaryImageUrl"
+                            class="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group-hover:ring-2 group-hover:ring-indigo-400 transition-all">
+                            <img :src="primaryImageUrl" alt="Product image" class="w-full h-full object-cover" />
+                        </div>
+                        <div v-else
+                            class="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center text-gray-400 group-hover:border-indigo-400 group-hover:bg-indigo-50 transition-colors">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span class="text-[10px] mt-0.5">Add image</span>
+                        </div>
+                    </button>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="font-mono text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{{ product.asin }}</span>
+                            <span v-if="product.sku" class="text-xs text-gray-400">SKU: {{ product.sku }}</span>
+                            <span v-if="product.brand" class="text-xs text-gray-500">{{ product.brand }}</span>
+                        </div>
+                        <h2 class="text-sm text-gray-700 leading-snug mb-2 line-clamp-2" :title="product.title">{{ product.title }}</h2>
+                        <div class="flex items-center gap-4 text-xs text-gray-500">
+                            <span v-if="product.price">₹{{ product.price?.toLocaleString('en-IN') }}</span>
+                            <span v-if="product.rating">{{ product.rating }}★ ({{ product.review_count }} reviews)</span>
+                            <span v-if="product.category">{{ product.category }}</span>
+                        </div>
                     </div>
                 </div>
                 <div class="ml-4 text-right flex-shrink-0 space-y-2">
@@ -389,11 +408,13 @@ function barColor(score: number, max: number) {
                         <h3 class="text-base font-semibold text-gray-900">Product Images</h3>
                         <p class="text-xs text-gray-500 mt-0.5">
                             {{ galleryImages.length }} image{{ galleryImages.length !== 1 ? 's' : '' }} uploaded ·
-                            First image is primary (used in SEO campaigns) · Max 10 images, 5MB each
+                            Primary image is used in SEO campaigns · Up to 20 images, 5MB each ·
+                            JPG, JPEG, PNG, WebP
                         </p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <input ref="fileInputRef" type="file" accept="image/jpeg,image/png,image/webp"
+                        <input ref="fileInputRef" type="file"
+                            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                             multiple class="hidden" @change="uploadImages" />
                         <button @click="fileInputRef?.click()" :disabled="imageUploading"
                             class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
@@ -457,7 +478,7 @@ function barColor(score: number, max: number) {
                     </div>
 
                     <!-- Add more slot -->
-                    <div v-if="galleryImages.length < 10"
+                    <div v-if="galleryImages.length < 20"
                         class="aspect-square rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
                         @click="fileInputRef?.click()">
                         <svg class="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -60,6 +60,25 @@ return [
             'report' => false,
         ],
 
+        // Identical to 's3' but signs presigned URLs with a browser-reachable
+        // endpoint (localhost:9000). The backend talks to MinIO via 'minio:9000'
+        // (the 's3' disk), but the browser cannot resolve that hostname.
+        // Generating a presigned URL is pure local computation (no network call),
+        // so signing with the public endpoint here is safe and yields URLs the
+        // browser can actually open.
+        's3_public' => [
+            'driver' => 's3',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_BUCKET'),
+            'url' => env('AWS_URL'),
+            'endpoint' => env('AWS_PUBLIC_ENDPOINT', env('AWS_ENDPOINT')),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*
