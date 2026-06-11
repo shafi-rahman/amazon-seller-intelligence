@@ -14,6 +14,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Product image gallery — multiple images
     Route::get('workspaces/{workspaceId}/products/{product}/images',                   [ProductController::class, 'listImages']);
     Route::post('workspaces/{workspaceId}/products/{product}/images',                  [ProductController::class, 'uploadImages']);
+    Route::post('workspaces/{workspaceId}/products/{product}/images/generate',         [ProductController::class, 'generateImages']);
     Route::delete('workspaces/{workspaceId}/products/{product}/images/{imageId}',      [ProductController::class, 'deleteProductImage']);
     Route::put('workspaces/{workspaceId}/products/{product}/images/{imageId}/primary', [ProductController::class, 'setPrimaryImage']);
     Route::put('workspaces/{workspaceId}/products/{product}/images/reorder',           [ProductController::class, 'reorderImages']);

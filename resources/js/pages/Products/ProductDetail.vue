@@ -26,6 +26,12 @@ const fileInputRef    = ref<HTMLInputElement | null>(null)
 const lightboxUrl     = ref<string | null>(null)
 import api from '@/api/axios'
 
+// AI image generation
+const showAiTools     = ref(false)
+const aiPrompt        = ref('')
+const aiCount         = ref(4)
+const aiGenerating    = ref(false)
+
 onMounted(async () => {
     // On hard refresh the workspace may not be loaded yet — await it.
     const ws = await workspaceStore.ensureLoaded()
@@ -116,6 +122,40 @@ async function setPrimary(imageId: string) {
         toast.error('Failed to set primary image')
     } finally {
         settingPrimary.value = null
+    }
+}
+
+async function generateAiImages() {
+    const wsId = workspaceStore.current?.id
+    if (!wsId || !product.value) return
+    const id = product.value.id
+    const target = galleryImages.value.length + aiCount.value
+    aiGenerating.value = true
+    try {
+        await api.post(`/workspaces/${wsId}/products/${id}/images/generate`, {
+            count: aiCount.value,
+            prompt: aiPrompt.value || undefined,
+        })
+        toast.success(`Generating ${aiCount.value} images with NVIDIA FLUX… they'll appear shortly.`)
+        showAiTools.value = false
+        aiPrompt.value = ''
+
+        // Poll until the new images appear (or ~2.5 min safety cap).
+        const started = Date.now()
+        const poll = async () => {
+            await productsStore.fetchOne(wsId, id)
+            const done = galleryImages.value.length >= target
+            if (done || Date.now() - started > 150000) {
+                aiGenerating.value = false
+                if (done) toast.success('AI images ready!')
+                return
+            }
+            setTimeout(poll, 4000)
+        }
+        setTimeout(poll, 5000)
+    } catch (e: any) {
+        toast.error(e.response?.data?.message ?? 'Could not start image generation')
+        aiGenerating.value = false
     }
 }
 
@@ -418,6 +458,10 @@ function barColor(score: number, max: number) {
                         <input ref="fileInputRef" type="file"
                             accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                             multiple class="hidden" @change="uploadImages" />
+                        <button @click="showAiTools = !showAiTools" :disabled="aiGenerating"
+                            class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 transition-all">
+                            ✨ {{ aiGenerating ? 'Generating…' : 'AI Generate' }}
+                        </button>
                         <button @click="fileInputRef?.click()" :disabled="imageUploading"
                             class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
                             <svg v-if="!imageUploading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -430,6 +474,40 @@ function barColor(score: number, max: number) {
                             {{ imageUploading ? 'Uploading…' : 'Upload Images' }}
                         </button>
                     </div>
+                </div>
+
+                <!-- AI image generation panel -->
+                <div v-if="showAiTools" class="mb-5 bg-purple-50 border border-purple-200 rounded-xl p-4">
+                    <p class="text-sm font-semibold text-purple-900 mb-1">✨ Generate product images with AI</p>
+                    <p class="text-xs text-purple-600 mb-3">
+                        NVIDIA FLUX creates images from your product title &amp; description. Add a note below to guide the style (optional).
+                    </p>
+                    <textarea v-model="aiPrompt" rows="2"
+                        placeholder="e.g. on a marble kitchen counter, warm natural light, lifestyle setting, minimal props"
+                        class="w-full border border-purple-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y bg-white mb-3" />
+                    <div class="flex items-center gap-3">
+                        <label class="text-xs text-purple-800">How many?</label>
+                        <select v-model.number="aiCount" class="border border-purple-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+                            <option :value="2">2 images</option>
+                            <option :value="3">3 images</option>
+                            <option :value="4">4 images</option>
+                            <option :value="5">5 images</option>
+                        </select>
+                        <button @click="generateAiImages" :disabled="aiGenerating"
+                            class="px-4 py-1.5 text-sm bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 transition-all">
+                            {{ aiGenerating ? '⏳ Generating…' : '✨ Generate' }}
+                        </button>
+                        <span class="text-xs text-purple-500">Free · ~10–15s each</span>
+                    </div>
+                </div>
+
+                <!-- Generating banner -->
+                <div v-if="aiGenerating" class="mb-5 flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
+                    <svg class="animate-spin w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    <span class="text-sm text-indigo-800">NVIDIA FLUX is generating your product images — they'll appear here automatically.</span>
                 </div>
 
                 <!-- Empty state -->

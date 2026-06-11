@@ -4,6 +4,7 @@ namespace App\Modules\Products\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Products\Jobs\AnalyzeProductJob;
+use App\Modules\Products\Jobs\GenerateProductImagesJob;
 use App\Modules\Products\Models\Product;
 use App\Modules\Products\Models\ProductImage;
 use App\Modules\Products\Resources\ProductDetailResource;
@@ -181,6 +182,54 @@ class ProductController extends Controller
         }
 
         return $this->success(['uploaded' => $uploaded, 'count' => count($uploaded)], 201);
+    }
+
+    // POST /workspaces/{id}/products/{product}/images/generate
+    // Generate several AI images for the product (NVIDIA FLUX), derived from the
+    // product title/description, optionally guided by a user prompt. Runs async.
+    public function generateImages(Request $request, int $workspaceId, Product $product): JsonResponse
+    {
+        $workspace = Workspace::findOrFail($workspaceId);
+        abort_unless($workspace->hasMember($request->user()), 403);
+        abort_unless($product->workspace_id === $workspaceId, 404);
+
+        $validated = $request->validate([
+            'count'  => ['sometimes', 'integer', 'min:1', 'max:5'],
+            'prompt' => ['sometimes', 'nullable', 'string', 'max:1000'],
+        ]);
+
+        $count    = $validated['count'] ?? 4;
+        $guidance = trim((string) ($validated['prompt'] ?? ''));
+
+        // Build the subject from the product so images actually depict THIS product.
+        $desc    = trim(strip_tags((string) $product->description));
+        $subject = trim(($product->brand ? $product->brand . ' ' : '') . ($product->title ?? $product->asin));
+        $base    = $guidance !== ''
+            ? "{$guidance}. Product: {$subject}."
+            : "Professional product photography of {$subject}." . ($desc !== '' ? ' ' . \Illuminate\Support\Str::limit($desc, 240, '') : '');
+
+        // Distinct angles/styles give a varied set the seller can choose from.
+        $styles = [
+            'front-facing studio shot on a clean white background, soft even lighting',
+            'lifestyle shot in a real-world setting, natural light, in use',
+            'close-up detail shot highlighting texture and material quality',
+            'three-quarter angle on a wooden surface with soft shadows',
+            'top-down flat lay on a minimal neutral background',
+        ];
+
+        $suffix  = 'high detail, commercial e-commerce product shot, sharp focus, no text, no watermark, no logo';
+        $prompts = [];
+        for ($i = 0; $i < $count; $i++) {
+            $prompts[] = "{$base} {$styles[$i % count($styles)]}, {$suffix}";
+        }
+
+        GenerateProductImagesJob::dispatch($product->id, $prompts)->onQueue('ai');
+
+        return $this->success([
+            'status'   => 'generating',
+            'count'    => $count,
+            'existing' => $product->images()->count(),
+        ], 202);
     }
 
     // DELETE /workspaces/{id}/products/{product}/images/{imagePublicId}
