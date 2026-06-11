@@ -119,25 +119,25 @@ export const useSeoStore = defineStore('seo', () => {
         const { data } = await api.post(`/seo/posts/${postId}/image/upload`, form, {
             headers: { 'Content-Type': 'multipart/form-data' },
         })
-        patchPost(postId, { image_url: (data.data ?? data).image_url })
+        const d = data.data ?? data
+        patchPost(postId, { image_url: d.image_url, image_path: d.image_path })
     }
 
     // (Re)generate the AI image, optionally with a custom reference prompt
     async function regeneratePostImage(postId: number, prompt?: string): Promise<void> {
         const { data } = await api.post(`/seo/posts/${postId}/image/generate`, { prompt })
         const d = data.data ?? data
-        patchPost(postId, { image_url: d.image_url, image_prompt: d.image_prompt })
+        patchPost(postId, { image_url: d.image_url, image_path: d.image_path, image_prompt: d.image_prompt })
     }
 
     // Reuse the image from a sibling post in the same campaign
     async function copyPostImage(postId: number, sourcePostId: number): Promise<void> {
         const { data } = await api.post(`/seo/posts/${postId}/image/copy`, { source_post_id: sourcePostId })
         const d = data.data ?? data
-        const source = current.value?.posts?.find(p => p.id === sourcePostId)
         patchPost(postId, {
             image_url: d.image_url,
+            image_path: d.image_path,
             image_prompt: d.image_prompt,
-            image_path: source?.image_path ?? null,
         })
     }
 

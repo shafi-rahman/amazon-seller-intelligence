@@ -177,8 +177,9 @@ class SeoCampaignController extends Controller
         $post->update(['image_path' => $path]);
 
         return $this->success([
-            'post_id'   => $post->id,
-            'image_url' => $post->imageUrl(),
+            'post_id'    => $post->id,
+            'image_url'  => $post->imageUrl(),
+            'image_path' => $post->image_path,
         ]);
     }
 
@@ -210,6 +211,7 @@ class SeoCampaignController extends Controller
         return $this->success([
             'post_id'      => $post->id,
             'image_url'    => $post->imageUrl(),
+            'image_path'   => $post->image_path,
             'image_prompt' => $post->image_prompt,
         ]);
     }
@@ -238,6 +240,7 @@ class SeoCampaignController extends Controller
         return $this->success([
             'post_id'      => $post->id,
             'image_url'    => $post->imageUrl(),
+            'image_path'   => $post->image_path,
             'image_prompt' => $post->image_prompt,
         ]);
     }
