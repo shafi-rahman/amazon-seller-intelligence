@@ -12,6 +12,8 @@ export interface SeoPost {
     image_prompt: string | null
     image_url: string | null
     image_path: string | null
+    previous_image_url: string | null
+    previous_image_path: string | null
     status: 'draft' | 'approved' | 'rejected' | 'published'
     created_at: string | null
 }
@@ -112,6 +114,17 @@ export const useSeoStore = defineStore('seo', () => {
         })
     }
 
+    // Common patch for all image-mutating responses
+    function patchImage(postId: number, d: any): void {
+        patchPost(postId, {
+            image_url: d.image_url,
+            image_path: d.image_path,
+            image_prompt: d.image_prompt,
+            previous_image_url: d.previous_image_url,
+            previous_image_path: d.previous_image_path,
+        })
+    }
+
     // Upload an image from the user's computer
     async function uploadPostImage(postId: number, file: File): Promise<void> {
         const form = new FormData()
@@ -119,32 +132,31 @@ export const useSeoStore = defineStore('seo', () => {
         const { data } = await api.post(`/seo/posts/${postId}/image/upload`, form, {
             headers: { 'Content-Type': 'multipart/form-data' },
         })
-        const d = data.data ?? data
-        patchPost(postId, { image_url: d.image_url, image_path: d.image_path })
+        patchImage(postId, data.data ?? data)
     }
 
     // (Re)generate the AI image, optionally with a custom reference prompt
     async function regeneratePostImage(postId: number, prompt?: string): Promise<void> {
         const { data } = await api.post(`/seo/posts/${postId}/image/generate`, { prompt })
-        const d = data.data ?? data
-        patchPost(postId, { image_url: d.image_url, image_path: d.image_path, image_prompt: d.image_prompt })
+        patchImage(postId, data.data ?? data)
     }
 
     // Reuse the image from a sibling post in the same campaign
     async function copyPostImage(postId: number, sourcePostId: number): Promise<void> {
         const { data } = await api.post(`/seo/posts/${postId}/image/copy`, { source_post_id: sourcePostId })
-        const d = data.data ?? data
-        patchPost(postId, {
-            image_url: d.image_url,
-            image_path: d.image_path,
-            image_prompt: d.image_prompt,
-        })
+        patchImage(postId, data.data ?? data)
+    }
+
+    // Restore the image the post had before the last change (toggles back/forth)
+    async function revertPostImage(postId: number): Promise<void> {
+        const { data } = await api.post(`/seo/posts/${postId}/image/revert`)
+        patchImage(postId, data.data ?? data)
     }
 
     return {
         campaigns, current, loading, tagging,
         PLATFORM_LABELS, PLATFORM_COLORS,
         fetchCampaigns, fetchCampaign, tagProduct, approvePost, rejectPost,
-        updatePost, uploadPostImage, regeneratePostImage, copyPostImage,
+        updatePost, uploadPostImage, regeneratePostImage, copyPostImage, revertPostImage,
     }
 })

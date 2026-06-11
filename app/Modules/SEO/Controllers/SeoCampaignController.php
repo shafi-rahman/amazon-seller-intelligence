@@ -174,13 +174,9 @@ class SeoCampaignController extends Controller
         $path = "seo/{$wsId}/{$post->campaign->public_id}/upload-" . Str::uuid() . '.' . $file->getClientOriginalExtension();
 
         Storage::disk('s3')->put($path, $file->get());
-        $post->update(['image_path' => $path]);
+        $post->applyNewImage($path);
 
-        return $this->success([
-            'post_id'    => $post->id,
-            'image_url'  => $post->imageUrl(),
-            'image_path' => $post->image_path,
-        ]);
+        return $this->imageResponse($post);
     }
 
     // POST /seo/posts/{postId}/image/generate  — (re)generate the image via NVIDIA FLUX,
@@ -203,17 +199,9 @@ class SeoCampaignController extends Controller
         abort_if(!$path, 502, 'Image generation failed. Please try again in a moment.');
 
         // Persist the prompt the user gave so it shows next time, and the new image.
-        $post->update([
-            'image_path'   => $path,
-            'image_prompt' => $prompt,
-        ]);
+        $post->applyNewImage($path, $prompt);
 
-        return $this->success([
-            'post_id'      => $post->id,
-            'image_url'    => $post->imageUrl(),
-            'image_path'   => $post->image_path,
-            'image_prompt' => $post->image_prompt,
-        ]);
+        return $this->imageResponse($post);
     }
 
     // POST /seo/posts/{postId}/image/copy  — reuse the image from a sibling post
@@ -232,16 +220,38 @@ class SeoCampaignController extends Controller
         abort_if(empty($source->image_path), 422, 'The selected post has no image to copy.');
 
         // Both posts simply point at the same stored object — no duplication needed.
-        $post->update([
-            'image_path'   => $source->image_path,
-            'image_prompt' => $source->image_prompt ?? $post->image_prompt,
-        ]);
+        // applyNewImage remembers the post's prior image so it can be reverted.
+        $post->applyNewImage($source->image_path, $source->image_prompt ?? $post->image_prompt);
 
+        return $this->imageResponse($post);
+    }
+
+    // POST /seo/posts/{postId}/image/revert  — restore the image the post had
+    // before the last change. Swaps current <-> previous so it can toggle back.
+    public function revertPostImage(Request $request, int $postId): JsonResponse
+    {
+        $post = $this->authorizePost($request, $postId);
+
+        abort_if(empty($post->previous_image_path), 422, 'No previous image to restore.');
+
+        $current = $post->image_path;
+        $post->image_path          = $post->previous_image_path;
+        $post->previous_image_path = $current;
+        $post->save();
+
+        return $this->imageResponse($post);
+    }
+
+    // Shared response shape for all image-mutating endpoints.
+    private function imageResponse(SeoPost $post): JsonResponse
+    {
         return $this->success([
-            'post_id'      => $post->id,
-            'image_url'    => $post->imageUrl(),
-            'image_path'   => $post->image_path,
-            'image_prompt' => $post->image_prompt,
+            'post_id'             => $post->id,
+            'image_url'           => $post->imageUrl(),
+            'image_path'          => $post->image_path,
+            'image_prompt'        => $post->image_prompt,
+            'previous_image_url'  => $post->previousImageUrl(),
+            'previous_image_path' => $post->previous_image_path,
         ]);
     }
 

@@ -192,6 +192,25 @@ async function useSiblingImage(sourceId: number) {
     }
 }
 
+// Whether there's a prior image to restore for the active post.
+const canRevert = computed(() =>
+    !!activePost.value?.previous_image_url &&
+    activePost.value.previous_image_path !== activePost.value.image_path
+)
+
+async function revertImage() {
+    if (!activePost.value) return
+    copyingImage.value = true
+    try {
+        await seoStore.revertPostImage(activePost.value.id)
+        toast.success('Restored the previous image')
+    } catch {
+        toast.error('Could not restore the previous image')
+    } finally {
+        copyingImage.value = false
+    }
+}
+
 async function quickApprove(post: SeoPost) {
     try {
         await seoStore.approvePost(post.id)
@@ -446,6 +465,16 @@ const PLATFORM_GUIDE: Record<string, string> = {
                                         {{ regenerating ? 'Generating…' : copyingImage ? 'Applying…' : 'Uploading…' }}
                                     </span>
                                 </div>
+                            </div>
+
+                            <!-- Revert to the image this post had before the last change -->
+                            <div v-if="canRevert" class="mt-3">
+                                <p class="text-xs font-medium text-gray-500 mb-1.5">Don't like it? Bring back the previous image</p>
+                                <button @click="revertImage" :disabled="copyingImage"
+                                    class="flex items-center gap-2 pl-1 pr-3 py-1 border border-amber-200 bg-amber-50 rounded-lg hover:border-amber-400 disabled:opacity-50 transition-colors">
+                                    <img :src="activePost.previous_image_url!" alt="" class="w-9 h-9 rounded object-cover border border-amber-200" />
+                                    <span class="text-xs text-amber-800">↩ Revert to previous image</span>
+                                </button>
                             </div>
 
                             <!-- Reuse an image from another platform in this campaign -->
