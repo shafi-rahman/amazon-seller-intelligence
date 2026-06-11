@@ -26,6 +26,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('seo/posts/{postId}',                 [SeoCampaignController::class, 'updatePost']);
     Route::post('seo/posts/{postId}/image/upload',   [SeoCampaignController::class, 'uploadPostImage']);
     Route::post('seo/posts/{postId}/image/generate', [SeoCampaignController::class, 'regeneratePostImage']);
+    Route::post('seo/posts/{postId}/image/copy',     [SeoCampaignController::class, 'copyPostImage']);
 });
 
 // Token-secured endpoints for OpenClaw skill (no session needed)

@@ -32,6 +32,7 @@ const editForm       = ref<{ title: string; caption: string; hashtags: string }>
 const imageInputRef  = ref<HTMLInputElement | null>(null)
 const uploadingImage = ref(false)
 const regenerating   = ref(false)
+const copyingImage   = ref(false)
 const showImageTools = ref(false)
 const refPrompt      = ref('')
 
@@ -166,6 +167,28 @@ async function regenerateImage() {
         toast.error(e.response?.data?.message ?? 'Image generation failed. Try again.')
     } finally {
         regenerating.value = false
+    }
+}
+
+// Sibling posts (same campaign) that have a DIFFERENT image we can reuse here.
+const reusableImages = computed(() => {
+    const cur = activePost.value
+    if (!cur) return []
+    return (campaign.value?.posts ?? []).filter(p =>
+        p.id !== cur.id && p.image_url && p.image_path && p.image_path !== cur.image_path
+    )
+})
+
+async function useSiblingImage(sourceId: number) {
+    if (!activePost.value) return
+    copyingImage.value = true
+    try {
+        await seoStore.copyPostImage(activePost.value.id, sourceId)
+        toast.success('Image applied to this post')
+    } catch {
+        toast.error('Could not copy that image')
+    } finally {
+        copyingImage.value = false
     }
 }
 
@@ -412,14 +435,31 @@ const PLATFORM_GUIDE: Record<string, string> = {
                                     <span class="text-3xl mb-1">🖼</span>
                                     <span class="text-xs">No image yet</span>
                                 </div>
-                                <!-- Loading overlay while regenerating/uploading -->
-                                <div v-if="regenerating || uploadingImage"
+                                <!-- Loading overlay while regenerating/uploading/copying -->
+                                <div v-if="regenerating || uploadingImage || copyingImage"
                                     class="absolute inset-0 bg-white/70 rounded-xl flex flex-col items-center justify-center">
                                     <svg class="animate-spin w-7 h-7 text-indigo-600 mb-2" fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                                     </svg>
-                                    <span class="text-xs text-indigo-700 font-medium">{{ regenerating ? 'Generating…' : 'Uploading…' }}</span>
+                                    <span class="text-xs text-indigo-700 font-medium">
+                                        {{ regenerating ? 'Generating…' : copyingImage ? 'Applying…' : 'Uploading…' }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Reuse an image from another platform in this campaign -->
+                            <div v-if="reusableImages.length" class="mt-3">
+                                <p class="text-xs font-medium text-gray-500 mb-1.5">Reuse an image from another post</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <button v-for="sib in reusableImages" :key="sib.id"
+                                        @click="useSiblingImage(sib.id)" :disabled="copyingImage"
+                                        class="flex items-center gap-2 pl-1 pr-3 py-1 border border-gray-200 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 disabled:opacity-50 transition-colors">
+                                        <img :src="sib.image_url!" alt="" class="w-9 h-9 rounded object-cover border border-gray-200" />
+                                        <span class="text-xs text-gray-700">
+                                            {{ PLATFORM_ICONS[sib.platform] }} Use {{ seoStore.PLATFORM_LABELS[sib.platform] }} image
+                                        </span>
+                                    </button>
                                 </div>
                             </div>
 

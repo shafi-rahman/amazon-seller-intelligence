@@ -44,6 +44,7 @@ class SeoCampaignResource extends JsonResource
                     'hashtags'       => $p->hashtags,
                     'image_prompt'   => $p->image_prompt,
                     'image_url'      => $p->imageUrl(),
+                    'image_path'     => $p->image_path, // stable key for cross-post comparison/reuse
                     'status'         => $p->status,
                     'created_at'     => $p->created_at?->toISOString(),
                 ])

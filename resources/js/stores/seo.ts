@@ -11,6 +11,7 @@ export interface SeoPost {
     hashtags: string | null
     image_prompt: string | null
     image_url: string | null
+    image_path: string | null
     status: 'draft' | 'approved' | 'rejected' | 'published'
     created_at: string | null
 }
@@ -128,10 +129,22 @@ export const useSeoStore = defineStore('seo', () => {
         patchPost(postId, { image_url: d.image_url, image_prompt: d.image_prompt })
     }
 
+    // Reuse the image from a sibling post in the same campaign
+    async function copyPostImage(postId: number, sourcePostId: number): Promise<void> {
+        const { data } = await api.post(`/seo/posts/${postId}/image/copy`, { source_post_id: sourcePostId })
+        const d = data.data ?? data
+        const source = current.value?.posts?.find(p => p.id === sourcePostId)
+        patchPost(postId, {
+            image_url: d.image_url,
+            image_prompt: d.image_prompt,
+            image_path: source?.image_path ?? null,
+        })
+    }
+
     return {
         campaigns, current, loading, tagging,
         PLATFORM_LABELS, PLATFORM_COLORS,
         fetchCampaigns, fetchCampaign, tagProduct, approvePost, rejectPost,
-        updatePost, uploadPostImage, regeneratePostImage,
+        updatePost, uploadPostImage, regeneratePostImage, copyPostImage,
     }
 })

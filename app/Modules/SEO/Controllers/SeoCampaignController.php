@@ -214,6 +214,34 @@ class SeoCampaignController extends Controller
         ]);
     }
 
+    // POST /seo/posts/{postId}/image/copy  — reuse the image from a sibling post
+    // (same campaign), so the user doesn't have to re-upload/regenerate it.
+    public function copyPostImage(Request $request, int $postId): JsonResponse
+    {
+        $post = $this->authorizePost($request, $postId);
+
+        $validated = $request->validate([
+            'source_post_id' => ['required', 'integer'],
+        ]);
+
+        $source = SeoPost::where('campaign_id', $post->campaign_id)
+            ->findOrFail($validated['source_post_id']);
+
+        abort_if(empty($source->image_path), 422, 'The selected post has no image to copy.');
+
+        // Both posts simply point at the same stored object — no duplication needed.
+        $post->update([
+            'image_path'   => $source->image_path,
+            'image_prompt' => $source->image_prompt ?? $post->image_prompt,
+        ]);
+
+        return $this->success([
+            'post_id'      => $post->id,
+            'image_url'    => $post->imageUrl(),
+            'image_prompt' => $post->image_prompt,
+        ]);
+    }
+
     // GET /seo/campaigns/{uuid}/product-data  (for OpenClaw skill)
     public function productData(Request $request, string $id): JsonResponse
     {
