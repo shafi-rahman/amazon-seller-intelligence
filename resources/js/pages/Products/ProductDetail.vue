@@ -31,6 +31,37 @@ const showAiTools     = ref(false)
 const aiPrompt        = ref('')
 const aiCount         = ref(4)
 const aiGenerating    = ref(false)
+const aiRefInput      = ref<HTMLInputElement | null>(null)
+const aiRefFile       = ref<File | null>(null)
+const aiRefPreview    = ref<string | null>(null)
+// When set, generation is a variation of an existing gallery image (its UUID).
+const aiRefImageId    = ref<string | null>(null)
+
+function onAiRefSelected(e: Event) {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+    aiRefFile.value = file
+    aiRefImageId.value = null
+    const reader = new FileReader()
+    reader.onload = ev => { aiRefPreview.value = ev.target?.result as string }
+    reader.readAsDataURL(file)
+}
+function clearAiRef() {
+    aiRefFile.value = null
+    aiRefPreview.value = null
+    aiRefImageId.value = null
+    if (aiRefInput.value) aiRefInput.value.value = ''
+}
+// Open the AI panel to make variations of a specific existing image.
+function makeVariation(img: any) {
+    clearAiRef()
+    aiRefImageId.value = img.id
+    aiRefPreview.value = img.url
+    aiCount.value = 2
+    showAiTools.value = true
+    // bring the panel into view
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 onMounted(async () => {
     // On hard refresh the workspace may not be loaded yet — await it.
@@ -132,13 +163,19 @@ async function generateAiImages() {
     const target = galleryImages.value.length + aiCount.value
     aiGenerating.value = true
     try {
-        await api.post(`/workspaces/${wsId}/products/${id}/images/generate`, {
-            count: aiCount.value,
-            prompt: aiPrompt.value || undefined,
+        const form = new FormData()
+        form.append('count', String(aiCount.value))
+        if (aiPrompt.value) form.append('prompt', aiPrompt.value)
+        if (aiRefFile.value) form.append('reference', aiRefFile.value)
+        if (aiRefImageId.value) form.append('reference_image_id', aiRefImageId.value)
+
+        await api.post(`/workspaces/${wsId}/products/${id}/images/generate`, form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
         })
-        toast.success(`Generating ${aiCount.value} images with NVIDIA FLUX… they'll appear shortly.`)
+        toast.success(`Generating ${aiCount.value} image${aiCount.value > 1 ? 's' : ''} with NVIDIA FLUX… they'll appear shortly.`)
         showAiTools.value = false
         aiPrompt.value = ''
+        clearAiRef()
 
         // Poll until the new images appear (or ~2.5 min safety cap).
         const started = Date.now()
@@ -480,11 +517,27 @@ function barColor(score: number, max: number) {
                 <div v-if="showAiTools" class="mb-5 bg-purple-50 border border-purple-200 rounded-xl p-4">
                     <p class="text-sm font-semibold text-purple-900 mb-1">✨ Generate product images with AI</p>
                     <p class="text-xs text-purple-600 mb-3">
-                        NVIDIA FLUX creates images from your product title &amp; description. Add a note below to guide the style (optional).
+                        NVIDIA FLUX creates images from your product title &amp; description. Add a note to guide the style, and optionally a reference image to match.
                     </p>
                     <textarea v-model="aiPrompt" rows="2"
                         placeholder="e.g. on a marble kitchen counter, warm natural light, lifestyle setting, minimal props"
                         class="w-full border border-purple-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y bg-white mb-3" />
+
+                    <!-- Optional reference image -->
+                    <div class="flex items-center gap-3 mb-3">
+                        <input ref="aiRefInput" type="file" class="hidden"
+                            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" @change="onAiRefSelected" />
+                        <button @click="aiRefInput?.click()" type="button"
+                            class="text-xs px-3 py-1.5 border border-purple-300 rounded-lg text-purple-700 hover:bg-purple-100 transition-colors">
+                            🖼 {{ (aiRefFile || aiRefImageId) ? 'Change reference' : 'Add reference image' }}
+                        </button>
+                        <div v-if="aiRefPreview" class="flex items-center gap-1.5">
+                            <img :src="aiRefPreview" alt="" class="w-9 h-9 rounded object-cover border border-purple-200" />
+                            <span class="text-[11px] text-purple-600">{{ aiRefImageId ? 'variation of this image' : 'reference' }}</span>
+                            <button @click="clearAiRef" class="text-xs text-purple-500 hover:text-purple-700">✕</button>
+                        </div>
+                    </div>
+
                     <div class="flex items-center gap-3">
                         <label class="text-xs text-purple-800">How many?</label>
                         <select v-model.number="aiCount" class="border border-purple-300 rounded-lg px-2 py-1.5 text-sm bg-white">
@@ -545,13 +598,18 @@ function barColor(score: number, max: number) {
                             <button v-if="!img.is_primary"
                                 @click.stop="setPrimary(img.id)"
                                 :disabled="settingPrimary === img.id"
-                                class="px-2 py-1 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50 w-24 text-center">
+                                class="px-2 py-1 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50 w-28 text-center">
                                 {{ settingPrimary === img.id ? '…' : '⭐ Set Primary' }}
+                            </button>
+                            <!-- Make AI variation of this image -->
+                            <button @click.stop="makeVariation(img)"
+                                class="px-2 py-1 bg-purple-600 text-white text-xs rounded-lg hover:bg-purple-700 w-28 text-center">
+                                ✨ Variation
                             </button>
                             <!-- Delete button -->
                             <button @click.stop="deleteImage(img.id)"
                                 :disabled="deletingImageId === img.id"
-                                class="px-2 py-1 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 disabled:opacity-50 w-24 text-center">
+                                class="px-2 py-1 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 disabled:opacity-50 w-28 text-center">
                                 {{ deletingImageId === img.id ? '…' : '🗑 Remove' }}
                             </button>
                         </div>

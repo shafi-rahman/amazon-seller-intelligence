@@ -153,10 +153,22 @@ export const useSeoStore = defineStore('seo', () => {
         patchImage(postId, data.data ?? data)
     }
 
+    // Upload a reference image + optional prompt → AI describes it and regenerates
+    async function regenerateFromReference(postId: number, file: File, prompt?: string): Promise<void> {
+        const form = new FormData()
+        form.append('reference', file)
+        if (prompt) form.append('prompt', prompt)
+        const { data } = await api.post(`/seo/posts/${postId}/image/from-reference`, form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        patchImage(postId, data.data ?? data)
+    }
+
     return {
         campaigns, current, loading, tagging,
         PLATFORM_LABELS, PLATFORM_COLORS,
         fetchCampaigns, fetchCampaign, tagProduct, approvePost, rejectPost,
         updatePost, uploadPostImage, regeneratePostImage, copyPostImage, revertPostImage,
+        regenerateFromReference,
     }
 })

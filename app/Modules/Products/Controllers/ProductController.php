@@ -3,6 +3,7 @@
 namespace App\Modules\Products\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\AI\Services\VisionService;
 use App\Modules\Products\Jobs\AnalyzeProductJob;
 use App\Modules\Products\Jobs\GenerateProductImagesJob;
 use App\Modules\Products\Models\Product;
@@ -187,26 +188,73 @@ class ProductController extends Controller
     // POST /workspaces/{id}/products/{product}/images/generate
     // Generate several AI images for the product (NVIDIA FLUX), derived from the
     // product title/description, optionally guided by a user prompt. Runs async.
-    public function generateImages(Request $request, int $workspaceId, Product $product): JsonResponse
+    //
+    // Accepts multipart so it can ALSO take a reference image:
+    //   - reference (uploaded file)       → "upload + describe" flow
+    //   - reference_image_id (gallery UUID) → "make a variation of this image" flow
+    // When a reference is given, a vision model describes it and that description
+    // guides generation (reference-guided regenerate).
+    public function generateImages(Request $request, int $workspaceId, Product $product, VisionService $vision): JsonResponse
     {
         $workspace = Workspace::findOrFail($workspaceId);
         abort_unless($workspace->hasMember($request->user()), 403);
         abort_unless($product->workspace_id === $workspaceId, 404);
 
         $validated = $request->validate([
-            'count'  => ['sometimes', 'integer', 'min:1', 'max:5'],
-            'prompt' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'count'              => ['sometimes', 'integer', 'min:1', 'max:5'],
+            'prompt'             => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'reference'          => ['sometimes', 'nullable', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
+            'reference_image_id' => ['sometimes', 'nullable', 'string'],
         ]);
 
         $count    = $validated['count'] ?? 4;
         $guidance = trim((string) ($validated['prompt'] ?? ''));
 
-        // Build the subject from the product so images actually depict THIS product.
+        // Resolve an optional reference image (uploaded file or existing gallery image).
+        $refBytes = null;
+        if ($request->hasFile('reference')) {
+            $refBytes = $request->file('reference')->get();
+        } elseif (!empty($validated['reference_image_id'])) {
+            $refImg = $product->images()->where('public_id', $validated['reference_image_id'])->first();
+            if ($refImg && $refImg->storage_path) {
+                $refBytes = Storage::disk('s3')->get($refImg->storage_path);
+            }
+        }
+
+        $refDesc = $refBytes ? $vision->describe($refBytes) : null;
+
+        $prompts = $this->buildImagePrompts($product, $count, $guidance, $refDesc);
+        GenerateProductImagesJob::dispatch($product->id, $prompts)->onQueue('ai');
+
+        return $this->success([
+            'status'        => 'generating',
+            'count'         => $count,
+            'existing'      => $product->images()->count(),
+            'used_reference'=> $refDesc !== null,
+        ], 202);
+    }
+
+    /**
+     * Build $count distinct FLUX prompts for a product. When $refDesc is given
+     * (a vision description of a reference image), generation is guided by it.
+     *
+     * @return string[]
+     */
+    private function buildImagePrompts(Product $product, int $count, string $guidance, ?string $refDesc): array
+    {
         $desc    = trim(strip_tags((string) $product->description));
         $subject = trim(($product->brand ? $product->brand . ' ' : '') . ($product->title ?? $product->asin));
-        $base    = $guidance !== ''
-            ? "{$guidance}. Product: {$subject}."
-            : "Professional product photography of {$subject}." . ($desc !== '' ? ' ' . \Illuminate\Support\Str::limit($desc, 240, '') : '');
+
+        if ($refDesc) {
+            // Reference-guided: anchor on what the reference image looks like.
+            $base = "Product photo of {$subject}, in the style of this reference: {$refDesc}."
+                . ($guidance !== '' ? " {$guidance}." : '');
+        } else {
+            $base = $guidance !== ''
+                ? "{$guidance}. Product: {$subject}."
+                : "Professional product photography of {$subject}."
+                    . ($desc !== '' ? ' ' . \Illuminate\Support\Str::limit($desc, 240, '') : '');
+        }
 
         // Distinct angles/styles give a varied set the seller can choose from.
         $styles = [
@@ -216,20 +264,13 @@ class ProductController extends Controller
             'three-quarter angle on a wooden surface with soft shadows',
             'top-down flat lay on a minimal neutral background',
         ];
-
         $suffix  = 'high detail, commercial e-commerce product shot, sharp focus, no text, no watermark, no logo';
+
         $prompts = [];
         for ($i = 0; $i < $count; $i++) {
             $prompts[] = "{$base} {$styles[$i % count($styles)]}, {$suffix}";
         }
-
-        GenerateProductImagesJob::dispatch($product->id, $prompts)->onQueue('ai');
-
-        return $this->success([
-            'status'   => 'generating',
-            'count'    => $count,
-            'existing' => $product->images()->count(),
-        ], 202);
+        return $prompts;
     }
 
     // DELETE /workspaces/{id}/products/{product}/images/{imagePublicId}

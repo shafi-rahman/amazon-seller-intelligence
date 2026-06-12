@@ -8,6 +8,7 @@ use App\Modules\SEO\Jobs\RunSeoAgentJob;
 use App\Modules\SEO\Models\SeoCampaign;
 use App\Modules\SEO\Models\SeoPost;
 use App\Modules\SEO\Resources\SeoCampaignResource;
+use App\Modules\AI\Services\VisionService;
 use App\Modules\SEO\Services\SeoImageService;
 use App\Modules\Workspace\Models\Workspace;
 use App\Traits\ApiResponse;
@@ -199,6 +200,34 @@ class SeoCampaignController extends Controller
         abort_if(!$path, 502, 'Image generation failed. Please try again in a moment.');
 
         // Persist the prompt the user gave so it shows next time, and the new image.
+        $post->applyNewImage($path, $prompt);
+
+        return $this->imageResponse($post);
+    }
+
+    // POST /seo/posts/{postId}/image/from-reference  — upload a reference image +
+    // a description; a vision model describes it and FLUX regenerates guided by both.
+    public function regenerateFromReference(Request $request, int $postId, VisionService $vision, SeoImageService $imageService): JsonResponse
+    {
+        $post = $this->authorizePost($request, $postId);
+
+        $validated = $request->validate([
+            'reference' => ['required', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
+            'prompt'    => ['sometimes', 'nullable', 'string', 'max:1000'],
+        ]);
+
+        $refDesc  = $vision->describe($request->file('reference')->get());
+        abort_if(!$refDesc, 502, 'Could not analyse the reference image. Please try again.');
+
+        $guidance = trim((string) ($validated['prompt'] ?? ''));
+        $prompt   = "In the style of this reference: {$refDesc}."
+            . ($guidance !== '' ? " {$guidance}." : '')
+            . ' high detail, social media post image, no text, no watermark';
+
+        $wsId = $post->campaign->workspace_id;
+        $path = $imageService->generate($prompt, $wsId, $post->campaign->public_id);
+        abort_if(!$path, 502, 'Image generation failed. Please try again in a moment.');
+
         $post->applyNewImage($path, $prompt);
 
         return $this->imageResponse($post);

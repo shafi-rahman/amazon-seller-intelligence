@@ -26,6 +26,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('seo/posts/{postId}',                 [SeoCampaignController::class, 'updatePost']);
     Route::post('seo/posts/{postId}/image/upload',   [SeoCampaignController::class, 'uploadPostImage']);
     Route::post('seo/posts/{postId}/image/generate', [SeoCampaignController::class, 'regeneratePostImage']);
+    Route::post('seo/posts/{postId}/image/from-reference', [SeoCampaignController::class, 'regenerateFromReference']);
     Route::post('seo/posts/{postId}/image/copy',     [SeoCampaignController::class, 'copyPostImage']);
     Route::post('seo/posts/{postId}/image/revert',   [SeoCampaignController::class, 'revertPostImage']);
 });
