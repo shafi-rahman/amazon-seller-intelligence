@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useProductsStore } from '@/stores/products'
@@ -14,7 +14,7 @@ const productsStore  = useProductsStore()
 const seoStore       = useSeoStore()
 const toast          = useToastStore()
 
-const activeTab    = ref<'overview' | 'score' | 'optimization' | 'keywords' | 'image'>('overview')
+const activeTab    = ref<'overview' | 'score' | 'optimization' | 'keywords' | 'image' | 'competitors'>('overview')
 const analyzing    = ref(false)
 const applyingRewrite = ref(false)
 const editedRewrite = ref<Record<string, string>>({})
@@ -22,6 +22,111 @@ const editedRewrite = ref<Record<string, string>>({})
 // Edit product details
 const showEdit   = ref(false)
 const savingEdit = ref(false)
+
+// Competitors
+const competitors   = ref<any[]>([])
+const benchmark     = ref<any | null>(null)
+const keywordGaps   = ref<any[]>([])
+const compLoading   = ref(false)
+const compAddMode   = ref<'html' | 'csv'>('html')
+const compHtml      = ref('')
+const compAsin      = ref('')
+const compCsvInput  = ref<HTMLInputElement | null>(null)
+const compBusy      = ref(false)
+let compPollTimer: ReturnType<typeof setInterval> | null = null
+
+async function loadCompetitors() {
+    const wsId = workspaceStore.current?.id
+    if (!wsId || !product.value) return
+    const id = product.value.id
+    compLoading.value = true
+    try {
+        const [c, b, g] = await Promise.all([
+            api.get(`/workspaces/${wsId}/products/${id}/competitors`),
+            api.get(`/workspaces/${wsId}/products/${id}/benchmark`),
+            api.get(`/workspaces/${wsId}/products/${id}/keyword-gaps`, { params: { per_page: 30 } }),
+        ])
+        competitors.value = c.data.data ?? c.data
+        benchmark.value   = b.data.data ?? b.data
+        keywordGaps.value = g.data.data ?? g.data
+    } catch { /* ignore */ } finally {
+        compLoading.value = false
+    }
+}
+
+function pollCompetitors(targetCount: number) {
+    const started = Date.now()
+    if (compPollTimer) clearInterval(compPollTimer)
+    compPollTimer = setInterval(async () => {
+        await loadCompetitors()
+        if (competitors.value.length >= targetCount || Date.now() - started > 90000) {
+            if (compPollTimer) { clearInterval(compPollTimer); compPollTimer = null }
+            compBusy.value = false
+        }
+    }, 4000)
+}
+
+async function addCompetitorHtml() {
+    const wsId = workspaceStore.current?.id
+    if (!wsId || !product.value || compHtml.value.trim().length < 100) {
+        toast.error('Paste the full competitor page HTML (copy page source).')
+        return
+    }
+    compBusy.value = true
+    const target = competitors.value.length + 1
+    try {
+        await api.post(`/workspaces/${wsId}/products/${product.value.id}/competitors/html`, {
+            html_content: compHtml.value, asin: compAsin.value || undefined,
+        })
+        toast.success('Competitor added — analyzing…')
+        compHtml.value = ''; compAsin.value = ''
+        pollCompetitors(target)
+    } catch (e: any) {
+        toast.error(e.response?.data?.message ?? 'Could not add competitor')
+        compBusy.value = false
+    }
+}
+
+async function addCompetitorCsv(e: Event) {
+    const wsId = workspaceStore.current?.id
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!wsId || !product.value || !file) return
+    compBusy.value = true
+    const target = competitors.value.length + 1
+    try {
+        const form = new FormData()
+        form.append('file', file)
+        const { data } = await api.post(`/workspaces/${wsId}/products/${product.value.id}/competitors/csv`, form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        const d = data.data ?? data
+        toast.success(`Imported ${d.imported} competitor${d.imported !== 1 ? 's' : ''} — analyzing…`)
+        pollCompetitors(target + (d.imported - 1))
+    } catch (e: any) {
+        toast.error(e.response?.data?.message ?? 'CSV import failed')
+        compBusy.value = false
+    } finally {
+        if (compCsvInput.value) compCsvInput.value.value = ''
+    }
+}
+
+async function deleteCompetitor(cid: number) {
+    const wsId = workspaceStore.current?.id
+    if (!wsId || !product.value) return
+    try {
+        await api.delete(`/workspaces/${wsId}/products/${product.value.id}/competitors/${cid}`)
+        competitors.value = competitors.value.filter(c => c.id !== cid)
+        toast.success('Competitor removed')
+    } catch {
+        toast.error('Could not remove competitor')
+    }
+}
+
+// Load competitor data when the tab is first opened
+watch(activeTab, (t) => {
+    if (t === 'competitors' && competitors.value.length === 0 && !compLoading.value) loadCompetitors()
+})
+onUnmounted(() => { if (compPollTimer) clearInterval(compPollTimer) })
 
 async function saveProduct(payload: Record<string, any>, images: File[] = []) {
     const wsId = workspaceStore.current?.id
@@ -381,7 +486,8 @@ function barColor(score: number, max: number) {
                     { key: 'score', label: 'Score Breakdown' },
                     { key: 'optimization', label: 'Optimization' },
                     { key: 'keywords', label: 'Keywords' },
-                    { key: 'image', label: '🖼 Images' }
+                    { key: 'image', label: '🖼 Images' },
+                    { key: 'competitors', label: '🥊 Competitors' }
                 ]" :key="tab.key"
                     @click="activeTab = tab.key as any"
                     :class="['px-4 py-2.5 text-sm font-medium transition-colors border-b-2',
@@ -678,6 +784,107 @@ function barColor(score: number, max: number) {
                 <div class="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
                     <strong>📸 SEO Campaigns:</strong> The <span class="font-semibold">PRIMARY</span> image is automatically used
                     for Instagram and Facebook posts. Click any image to enlarge. Hover to set primary or remove.
+                </div>
+            </div>
+
+            <!-- Tab: Competitors -->
+            <div v-else-if="activeTab === 'competitors'" class="space-y-4">
+                <!-- Add competitor -->
+                <div class="bg-white rounded-lg border border-gray-200 p-5">
+                    <h3 class="text-base font-semibold text-gray-900 mb-1">Add a competitor</h3>
+                    <p class="text-xs text-gray-500 mb-3">
+                        Compare against rival listings. Competitor titles, bullets &amp; keywords feed the AI optimization
+                        so your rewritten title/bullets/keywords reflect what actually sells in this category.
+                    </p>
+                    <div class="flex gap-2 mb-3">
+                        <button @click="compAddMode = 'html'"
+                            :class="['px-3 py-1.5 text-xs rounded-lg border', compAddMode === 'html' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'border-gray-200 text-gray-600']">
+                            Paste HTML
+                        </button>
+                        <button @click="compAddMode = 'csv'"
+                            :class="['px-3 py-1.5 text-xs rounded-lg border', compAddMode === 'csv' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'border-gray-200 text-gray-600']">
+                            Upload CSV
+                        </button>
+                    </div>
+
+                    <!-- HTML paste -->
+                    <div v-if="compAddMode === 'html'">
+                        <input v-model="compAsin" type="text" placeholder="Competitor ASIN (optional)"
+                            class="w-56 border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                        <textarea v-model="compHtml" rows="4"
+                            placeholder="Open the competitor's Amazon page → View Page Source → paste the full HTML here…"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y" />
+                        <button @click="addCompetitorHtml" :disabled="compBusy"
+                            class="mt-2 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                            {{ compBusy ? 'Adding…' : 'Add competitor' }}
+                        </button>
+                    </div>
+
+                    <!-- CSV upload -->
+                    <div v-else>
+                        <input ref="compCsvInput" type="file" accept=".csv,text/csv" class="hidden" @change="addCompetitorCsv" />
+                        <button @click="compCsvInput?.click()" :disabled="compBusy"
+                            class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                            {{ compBusy ? 'Importing…' : 'Choose CSV file' }}
+                        </button>
+                        <p class="text-xs text-gray-400 mt-2">
+                            Columns: <span class="font-mono">asin, title, brand, price, rating, review_count, bullet_1…5, description</span> (asin required).
+                        </p>
+                    </div>
+                </div>
+
+                <div v-if="compLoading" class="text-center text-gray-400 text-sm py-6">Loading competitors…</div>
+
+                <!-- Benchmark -->
+                <div v-if="benchmark && benchmark.competitor_count > 0" class="bg-white rounded-lg border border-gray-200 p-5">
+                    <h3 class="text-base font-semibold text-gray-900 mb-3">Benchmark — you vs {{ benchmark.competitor_count }} competitor(s)</h3>
+                    <div class="grid grid-cols-3 gap-3 text-center mb-2">
+                        <div class="bg-indigo-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-500">Your price</div>
+                            <div class="text-lg font-bold text-gray-900">₹{{ benchmark.product.price ?? '—' }}</div>
+                        </div>
+                        <div class="bg-indigo-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-500">Your rating</div>
+                            <div class="text-lg font-bold text-gray-900">{{ benchmark.product.rating ?? '—' }}★</div>
+                        </div>
+                        <div class="bg-indigo-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-500">Your reviews</div>
+                            <div class="text-lg font-bold text-gray-900">{{ benchmark.product.review_count ?? '—' }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Competitor list -->
+                <div class="bg-white rounded-lg border border-gray-200 p-5">
+                    <h3 class="text-base font-semibold text-gray-900 mb-3">Competitors ({{ competitors.length }})</h3>
+                    <div v-if="competitors.length === 0 && !compLoading" class="text-sm text-gray-400 py-4 text-center">
+                        No competitors yet. Add one above to start comparing.
+                    </div>
+                    <div v-for="c in competitors" :key="c.id" class="flex items-start justify-between gap-3 py-3 border-b border-gray-50 last:border-0">
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-gray-800 truncate" :title="c.title">{{ c.title ?? c.asin }}</p>
+                            <p class="text-xs text-gray-500 mt-0.5">
+                                <span class="font-mono">{{ c.asin }}</span>
+                                <span v-if="c.brand"> · {{ c.brand }}</span>
+                                <span v-if="c.price"> · ₹{{ c.price }}</span>
+                                <span v-if="c.rating"> · {{ c.rating }}★ ({{ c.review_count ?? 0 }})</span>
+                            </p>
+                        </div>
+                        <button @click="deleteCompetitor(c.id)" class="text-xs text-red-500 hover:text-red-700 flex-shrink-0">Remove</button>
+                    </div>
+                </div>
+
+                <!-- Keyword gaps -->
+                <div v-if="keywordGaps.length" class="bg-white rounded-lg border border-gray-200 p-5">
+                    <h3 class="text-base font-semibold text-gray-900 mb-1">Keyword gaps</h3>
+                    <p class="text-xs text-gray-500 mb-3">Keywords competitors use that your listing is missing — the AI rewrite weaves these in.</p>
+                    <div class="flex flex-wrap gap-1.5">
+                        <span v-for="g in keywordGaps" :key="g.id"
+                            class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-xs"
+                            :title="`priority ${g.priority_score}`">
+                            {{ g.keyword }}
+                        </span>
+                    </div>
                 </div>
             </div>
 

@@ -50,13 +50,13 @@ class AiAnalysisService
     /**
      * Generate AI-powered rewrites via the active provider.
      */
-    public function generateRewrite(Product $product, array $missingKeywords): ?array
+    public function generateRewrite(Product $product, array $missingKeywords, array $competitorContext = []): ?array
     {
         if (!$this->isConfigured()) {
             return null;
         }
 
-        $prompt = $this->buildRewritePrompt($product, $missingKeywords);
+        $prompt = $this->buildRewritePrompt($product, $missingKeywords, $competitorContext);
 
         try {
             $result = $this->router->chat([
@@ -123,13 +123,24 @@ Respond with ONLY a valid JSON object (no markdown, no explanation outside the J
 PROMPT;
     }
 
-    private function buildRewritePrompt(Product $product, array $missingKeywords): string
+    private function buildRewritePrompt(Product $product, array $missingKeywords, array $competitorContext = []): string
     {
         $bullets = array_filter([
             $product->bullet_1, $product->bullet_2, $product->bullet_3,
             $product->bullet_4, $product->bullet_5,
         ]);
         $missingList = implode(', ', array_slice($missingKeywords, 0, 15));
+
+        // Competitor reference, when available, so the rewrite reflects how the
+        // top-selling competitors phrase titles and which keywords they win on.
+        $competitorBlock = '';
+        $compKeywords = array_slice($competitorContext['keywords'] ?? [], 0, 20);
+        $compTitles   = array_slice($competitorContext['titles'] ?? [], 0, 5);
+        if ($compKeywords || $compTitles) {
+            $kwLine    = $compKeywords ? 'High-value keywords competitors rank for (weave in the relevant ones naturally): ' . implode(', ', $compKeywords) : '';
+            $titleLine = $compTitles ? "Competitor titles for tone/structure reference (do NOT copy, do NOT mention competitors):\n- " . implode("\n- ", $compTitles) : '';
+            $competitorBlock = "\nCOMPETITOR RESEARCH:\n{$kwLine}\n{$titleLine}\n";
+        }
 
         return <<<PROMPT
 You are an Amazon listing copywriter. Rewrite the following listing to maximize search visibility and conversion.
@@ -142,7 +153,7 @@ Bullets:
 Description (first 800 chars): {$this->truncate($product->description, 800)}
 Category: {$product->category}
 Missing keywords to incorporate naturally: {$missingList}
-
+{$competitorBlock}
 Return ONLY a valid JSON object:
 {
   "title": "optimized title under 200 chars",

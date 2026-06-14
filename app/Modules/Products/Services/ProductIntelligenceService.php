@@ -103,7 +103,26 @@ class ProductIntelligenceService
             $missingKeywords = collect($kw['issues'] ?? [])->toArray();
         }
 
-        $rewrite = $this->ai->generateRewrite($product, $missingKeywords);
+        // Ground the rewrite in real competitor data: high-value keyword gaps
+        // (terms competitors rank for that this product is missing) + competitor
+        // titles for style reference.
+        $competitorContext = [
+            'keywords' => \App\Modules\Competitors\Models\KeywordGap::where('product_id', $product->id)
+                ->orderByDesc('priority_score')
+                ->limit(20)
+                ->pluck('keyword')
+                ->unique()
+                ->values()
+                ->toArray(),
+            'titles' => $product->competitors()
+                ->whereNotNull('title')
+                ->orderByDesc('review_count')
+                ->limit(5)
+                ->pluck('title')
+                ->toArray(),
+        ];
+
+        $rewrite = $this->ai->generateRewrite($product, $missingKeywords, $competitorContext);
 
         if ($rewrite !== null) {
             ProductAnalysis::create([
