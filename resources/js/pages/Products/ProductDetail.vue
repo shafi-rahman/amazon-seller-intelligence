@@ -23,12 +23,20 @@ const editedRewrite = ref<Record<string, string>>({})
 const showEdit   = ref(false)
 const savingEdit = ref(false)
 
-async function saveProduct(payload: Record<string, any>) {
+async function saveProduct(payload: Record<string, any>, images: File[] = []) {
     const wsId = workspaceStore.current?.id
     if (!wsId || !product.value) return
     savingEdit.value = true
     try {
         await productsStore.update(wsId, product.value.id, payload)
+        if (images.length) {
+            const form = new FormData()
+            images.forEach(f => form.append('images[]', f))
+            await api.post(`/workspaces/${wsId}/products/${product.value.id}/images`, form, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            })
+            await productsStore.fetchOne(wsId, product.value.id)
+        }
         toast.success('Product details updated')
         showEdit.value = false
     } catch (e: any) {

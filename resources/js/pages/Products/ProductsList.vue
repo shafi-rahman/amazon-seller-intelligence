@@ -5,6 +5,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { useProductsStore } from '@/stores/products'
 import { useToastStore } from '@/stores/toast'
 import ProductForm from '@/components/ProductForm.vue'
+import api from '@/api/axios'
 
 const router        = useRouter()
 const workspaceStore = useWorkspaceStore()
@@ -16,13 +17,20 @@ const savingNew = ref(false)
 
 function openAdd() { showAdd.value = true }
 
-async function createProduct(payload: Record<string, any>) {
+async function createProduct(payload: Record<string, any>, images: File[] = []) {
     const wsId = workspaceStore.current?.id
     if (!wsId) return
     savingNew.value = true
     try {
         const product = await productsStore.create(wsId, payload)
-        toast.success('Product added')
+        if (images.length) {
+            const form = new FormData()
+            images.forEach(f => form.append('images[]', f))
+            await api.post(`/workspaces/${wsId}/products/${product.id}/images`, form, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            })
+        }
+        toast.success(images.length ? `Product added with ${images.length} image${images.length > 1 ? 's' : ''}` : 'Product added')
         showAdd.value = false
         router.push(`/products/${product.id}`)
     } catch (e: any) {
