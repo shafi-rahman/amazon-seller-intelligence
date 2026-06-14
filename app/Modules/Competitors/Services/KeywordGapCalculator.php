@@ -4,9 +4,22 @@ namespace App\Modules\Competitors\Services;
 
 class KeywordGapCalculator
 {
+    // Common English + e-commerce filler words that are never useful SEO gaps.
+    private const STOP_WORDS = [
+        'the','a','an','and','or','but','for','to','of','in','on','at','by','with','from','as',
+        'is','are','was','were','be','been','it','its','this','that','these','those','your','our',
+        'you','we','they','will','can','has','have','had','not','no','yes','all','any','each','more',
+        'most','new','best','top','pack','set','pcs','pc','piece','pieces','item','items','product',
+        'products','quality','premium','free','offer','sale','buy','online','amazon','brand','genuine',
+        'original','pack of','combo','x','ml','cm','mm','kg','gm','gms','inch','inches','size','color',
+        'colour','black','white','blue','red','green','grey','gray','pink',
+    ];
+
     /**
      * Calculate keyword gaps between our product keywords and competitor keywords.
      * Returns rows ready for insert into keyword_gaps.
+     *
+     * @param string[] $excludeBrands brand names to strip from gaps (product + competitor brand)
      */
     public function calculate(
         array $ourKeywords,     // [['keyword' => '', 'source' => '', 'frequency' => 0], ...]
@@ -15,7 +28,10 @@ class KeywordGapCalculator
         int   $competitorId,
         string $competitorTitle,
         array  $competitorBullets,
+        array  $excludeBrands = [],
     ): array {
+        $this->buildDropTokens($excludeBrands);
+
         // Build lookup maps: normalized_keyword → [frequency, source]
         $ourMap   = $this->buildMap($ourKeywords);
         $theirMap = $this->buildMap($theirKeywords);
@@ -30,6 +46,9 @@ class KeywordGapCalculator
 
         // Pass 1: scan competitor keywords for missing/underused
         foreach ($theirMap as $normalized => $theirData) {
+            if ($this->shouldDrop($normalized)) {
+                continue;
+            }
             $ourData = $ourMap[$normalized] ?? null;
 
             if ($ourData === null) {
@@ -69,6 +88,9 @@ class KeywordGapCalculator
 
         // Pass 2: scan our keywords for advantages (we have, they don't)
         foreach ($ourMap as $normalized => $ourData) {
+            if ($this->shouldDrop($normalized)) {
+                continue;
+            }
             $theirData = $theirMap[$normalized] ?? $theirMap[$this->singularize($normalized)] ?? null;
 
             if ($theirData === null) {
@@ -120,6 +142,68 @@ class KeywordGapCalculator
         };
 
         return min(95, $base + $frequencyBonus + $positionBonus);
+    }
+
+    /** @var array<string,bool> generic stop words */
+    private array $stopSet = [];
+    /** @var string[] brand words (len>=3), matched by prefix/substring */
+    private array $brandTokens = [];
+
+    private function buildDropTokens(array $excludeBrands): void
+    {
+        $this->stopSet = array_fill_keys(self::STOP_WORDS, true);
+        $this->brandTokens = [];
+        foreach ($excludeBrands as $brand) {
+            foreach ($this->extractWords(mb_strtolower((string) $brand)) as $w) {
+                if (mb_strlen($w) >= 3 && !isset($this->stopSet[$w])) {
+                    $this->brandTokens[] = $w;
+                }
+            }
+        }
+        $this->brandTokens = array_unique($this->brandTokens);
+    }
+
+    /** True if a keyword word relates to a brand token (handles "Rival" vs "RivalAudio"). */
+    private function isBrandWord(string $w): bool
+    {
+        if (mb_strlen($w) < 4) {
+            return false;
+        }
+        foreach ($this->brandTokens as $b) {
+            // exact, or one is a prefix of / contained in the other
+            if ($w === $b || str_starts_with($b, $w) || str_starts_with($w, $b) || str_contains($b, $w) || str_contains($w, $b)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Drop a keyword gap if it's noise: contains a brand word, is a stop word,
+     * numeric, too short, or a phrase where every word is a brand/stop word.
+     */
+    private function shouldDrop(string $keyword): bool
+    {
+        $keyword = trim($keyword);
+        if ($keyword === '' || mb_strlen($keyword) < 3 || !preg_match('/[a-z]/i', $keyword)) {
+            return true;
+        }
+
+        $words = array_values(array_filter(explode(' ', $keyword)));
+        if (empty($words)) {
+            return true;
+        }
+
+        $allDrop = true;
+        foreach ($words as $w) {
+            if ($this->isBrandWord($w)) {
+                return true; // any brand word anywhere → drop the whole phrase
+            }
+            if (!isset($this->stopSet[$w])) {
+                $allDrop = false;
+            }
+        }
+        return $allDrop; // every word was a stop word
     }
 
     private function buildMap(array $keywords): array

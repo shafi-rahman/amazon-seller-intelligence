@@ -70,6 +70,7 @@ class CompetitorAnalysisService
             $competitor->id,
             $competitor->title ?? '',
             $competitor->bullets(),
+            array_filter([$competitor->brand, $product->brand]),
         );
 
         // Replace existing gaps for this pair
