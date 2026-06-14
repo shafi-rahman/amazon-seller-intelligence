@@ -3,10 +3,34 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useProductsStore } from '@/stores/products'
+import { useToastStore } from '@/stores/toast'
+import ProductForm from '@/components/ProductForm.vue'
 
 const router        = useRouter()
 const workspaceStore = useWorkspaceStore()
 const productsStore  = useProductsStore()
+const toast          = useToastStore()
+
+const showAdd   = ref(false)
+const savingNew = ref(false)
+
+function openAdd() { showAdd.value = true }
+
+async function createProduct(payload: Record<string, any>) {
+    const wsId = workspaceStore.current?.id
+    if (!wsId) return
+    savingNew.value = true
+    try {
+        const product = await productsStore.create(wsId, payload)
+        toast.success('Product added')
+        showAdd.value = false
+        router.push(`/products/${product.id}`)
+    } catch (e: any) {
+        toast.error(e.response?.data?.message ?? 'Could not add product (check ASIN is unique)')
+    } finally {
+        savingNew.value = false
+    }
+}
 
 const filters = ref({ search: '', min_score: '', max_score: '', page: 1, per_page: 20 })
 const meta    = ref<any>({})
@@ -57,8 +81,28 @@ function scoreColor(score: number | null) {
                 <h1 class="text-2xl font-bold text-gray-900">Products</h1>
                 <p class="text-gray-500 text-sm mt-1">Listing intelligence and optimization</p>
             </div>
-            <RouterLink to="/imports/upload" class="text-sm text-indigo-600 hover:underline">+ Upload products CSV</RouterLink>
+            <div class="flex items-center gap-3">
+                <RouterLink to="/imports/upload" class="text-sm text-indigo-600 hover:underline">+ Upload products CSV</RouterLink>
+                <button @click="openAdd"
+                    class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+                    + Add Product
+                </button>
+            </div>
         </div>
+
+        <!-- Add Product modal -->
+        <Teleport to="body">
+            <div v-if="showAdd" class="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto p-4"
+                @click.self="showAdd = false">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-8 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-gray-900">Add Product</h2>
+                        <button @click="showAdd = false" class="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
+                    </div>
+                    <ProductForm :saving="savingNew" @save="createProduct" @cancel="showAdd = false" />
+                </div>
+            </div>
+        </Teleport>
 
         <!-- Filters -->
         <div class="flex flex-wrap gap-2 mb-4">

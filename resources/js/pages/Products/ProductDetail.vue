@@ -5,6 +5,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { useProductsStore } from '@/stores/products'
 import { useSeoStore } from '@/stores/seo'
 import { useToastStore } from '@/stores/toast'
+import ProductForm from '@/components/ProductForm.vue'
 
 const route         = useRoute()
 const router        = useRouter()
@@ -17,6 +18,25 @@ const activeTab    = ref<'overview' | 'score' | 'optimization' | 'keywords' | 'i
 const analyzing    = ref(false)
 const applyingRewrite = ref(false)
 const editedRewrite = ref<Record<string, string>>({})
+
+// Edit product details
+const showEdit   = ref(false)
+const savingEdit = ref(false)
+
+async function saveProduct(payload: Record<string, any>) {
+    const wsId = workspaceStore.current?.id
+    if (!wsId || !product.value) return
+    savingEdit.value = true
+    try {
+        await productsStore.update(wsId, product.value.id, payload)
+        toast.success('Product details updated')
+        showEdit.value = false
+    } catch (e: any) {
+        toast.error(e.response?.data?.message ?? 'Could not save (check ASIN is unique)')
+    } finally {
+        savingEdit.value = false
+    }
+}
 
 // Image gallery
 const imageUploading  = ref(false)
@@ -319,12 +339,32 @@ function barColor(score: number, max: number) {
                         </div>
                         <div class="text-xs text-gray-400">/ 100</div>
                     </div>
-                    <button @click="runAnalysis" :disabled="analyzing"
-                        class="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                        {{ analyzing ? 'Analyzing…' : 'Re-analyze' }}
-                    </button>
+                    <div class="flex gap-2 justify-end">
+                        <button @click="showEdit = true"
+                            class="px-3 py-1.5 text-xs border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors">
+                            ✏️ Edit Details
+                        </button>
+                        <button @click="runAnalysis" :disabled="analyzing"
+                            class="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                            {{ analyzing ? 'Analyzing…' : 'Re-analyze' }}
+                        </button>
+                    </div>
                 </div>
             </div>
+
+            <!-- Edit Details modal -->
+            <Teleport to="body">
+                <div v-if="showEdit" class="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto p-4"
+                    @click.self="showEdit = false">
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-8 p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-lg font-semibold text-gray-900">Edit Product Details</h2>
+                            <button @click="showEdit = false" class="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
+                        </div>
+                        <ProductForm :product="product" :saving="savingEdit" @save="saveProduct" @cancel="showEdit = false" />
+                    </div>
+                </div>
+            </Teleport>
 
             <!-- Tabs -->
             <div class="flex border-b border-gray-200 mb-4">

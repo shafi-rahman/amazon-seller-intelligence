@@ -52,5 +52,18 @@ export const useProductsStore = defineStore('products', () => {
         return current.value
     }
 
-    return { products, current, loading, rewrite, rewriteLoading, fetchAll, fetchOne, triggerAnalysis, generateRewrite, applyRewrite }
+    // Manually create a product
+    async function create(workspaceId: number, payload: Record<string, any>): Promise<any> {
+        const { data } = await api.post(`/workspaces/${workspaceId}/products`, payload)
+        return data.data ?? data
+    }
+
+    // Edit product details
+    async function update(workspaceId: number, productId: string, payload: Record<string, any>): Promise<any> {
+        const { data } = await api.put(`/workspaces/${workspaceId}/products/${productId}`, payload)
+        current.value = data.data ?? data
+        return current.value
+    }
+
+    return { products, current, loading, rewrite, rewriteLoading, fetchAll, fetchOne, triggerAnalysis, generateRewrite, applyRewrite, create, update }
 })

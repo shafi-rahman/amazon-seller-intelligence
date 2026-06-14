@@ -76,6 +76,63 @@ class ProductController extends Controller
         return $this->success(new ProductDetailResource($product));
     }
 
+    // POST /workspaces/{id}/products  — manually create a product
+    public function store(Request $request, int $workspaceId): JsonResponse
+    {
+        $workspace = Workspace::findOrFail($workspaceId);
+        abort_unless($workspace->hasMember($request->user()), 403);
+
+        $data = $this->validateProduct($request, $workspaceId);
+        $data['workspace_id'] = $workspaceId;
+        $data['source_type']  = 'manual';
+        $data['currency']     = $data['currency'] ?? 'INR';
+
+        $product = Product::create($data);
+
+        return $this->success(new ProductDetailResource($product->load(['keywords', 'images'])), 201);
+    }
+
+    // PUT /workspaces/{id}/products/{product}  — edit product details
+    public function update(Request $request, int $workspaceId, Product $product): JsonResponse
+    {
+        $workspace = Workspace::findOrFail($workspaceId);
+        abort_unless($workspace->hasMember($request->user()), 403);
+        abort_unless($product->workspace_id === $workspaceId, 404);
+
+        $data = $this->validateProduct($request, $workspaceId, $product->id);
+        $product->update($data);
+
+        return $this->success(new ProductDetailResource($product->load(['keywords', 'images'])));
+    }
+
+    /** Shared validation for create/update. ASIN unique per workspace. */
+    private function validateProduct(Request $request, int $workspaceId, ?int $ignoreId = null): array
+    {
+        $asinUnique = Rule::unique('products', 'asin')->where(fn($q) => $q->where('workspace_id', $workspaceId));
+        if ($ignoreId) {
+            $asinUnique->ignore($ignoreId);
+        }
+
+        return $request->validate([
+            'asin'         => ['required', 'string', 'max:50', $asinUnique],
+            'sku'          => ['nullable', 'string', 'max:100'],
+            'title'        => ['required', 'string', 'max:500'],
+            'brand'        => ['nullable', 'string', 'max:200'],
+            'category'     => ['nullable', 'string', 'max:200'],
+            'sub_category' => ['nullable', 'string', 'max:200'],
+            'bullet_1'     => ['nullable', 'string'],
+            'bullet_2'     => ['nullable', 'string'],
+            'bullet_3'     => ['nullable', 'string'],
+            'bullet_4'     => ['nullable', 'string'],
+            'bullet_5'     => ['nullable', 'string'],
+            'description'  => ['nullable', 'string'],
+            'price'        => ['nullable', 'numeric', 'min:0'],
+            'currency'     => ['nullable', 'string', 'max:5'],
+            'rating'       => ['nullable', 'numeric', 'min:0', 'max:5'],
+            'review_count' => ['nullable', 'integer', 'min:0'],
+        ]);
+    }
+
     // POST /workspaces/{id}/products/{product}/analyze
     public function analyze(Request $request, int $workspaceId, Product $product): JsonResponse
     {
