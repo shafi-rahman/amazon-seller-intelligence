@@ -102,7 +102,7 @@ class ProductsApiTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->user)
-            ->getJson("/api/v1/workspaces/{$this->workspace->id}/products/{$product->id}");
+            ->getJson("/api/v1/workspaces/{$this->workspace->id}/products/{$product->public_id}");
 
         $response->assertStatus(200)
             ->assertJsonPath('data.listing_score', 72)
@@ -118,7 +118,7 @@ class ProductsApiTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->user)
-            ->getJson("/api/v1/workspaces/{$this->workspace->id}/products/{$product->id}");
+            ->getJson("/api/v1/workspaces/{$this->workspace->id}/products/{$product->public_id}");
 
         $response->assertStatus(200)
             ->assertJsonStructure(['data' => ['top_keywords' => [['keyword', 'source', 'frequency']]]]);
@@ -130,7 +130,7 @@ class ProductsApiTest extends TestCase
         $product = $this->createProduct('B09ANALYZE1', score: null);
 
         $response = $this->actingAs($this->user)
-            ->postJson("/api/v1/workspaces/{$this->workspace->id}/products/{$product->id}/analyze");
+            ->postJson("/api/v1/workspaces/{$this->workspace->id}/products/{$product->public_id}/analyze");
 
         $response->assertStatus(202);
         Queue::assertPushedOn('ai', AnalyzeProductJob::class);
@@ -177,7 +177,7 @@ class ProductsApiTest extends TestCase
         $product = $this->createProduct('B09OTHERPRO', score: 50, workspaceId: $ws2->id);
 
         $response = $this->actingAs($this->user)
-            ->getJson("/api/v1/workspaces/{$ws2->id}/products/{$product->id}");
+            ->getJson("/api/v1/workspaces/{$ws2->id}/products/{$product->public_id}");
 
         $response->assertStatus(403);
     }

@@ -32,7 +32,12 @@ class CopilotTest extends TestCase
 
     public function test_ai_router_detects_groq_as_configured(): void
     {
-        config(['ai.providers.groq.api_key' => 'test-groq-key']);
+        // nvidia is the default/priority provider; clear it (and the others)
+        // so groq is the only configured provider and becomes active.
+        config(['ai.providers.nvidia.api_key'    => null]);
+        config(['ai.providers.anthropic.api_key' => null]);
+        config(['ai.providers.openai.api_key'    => null]);
+        config(['ai.providers.groq.api_key'      => 'test-groq-key']);
         $router = new AIRouter();
         $this->assertTrue($router->isAnyProviderConfigured());
         $this->assertEquals('groq', $router->activeProvider());
@@ -40,6 +45,7 @@ class CopilotTest extends TestCase
 
     public function test_ai_router_returns_unconfigured_when_no_keys(): void
     {
+        config(['ai.providers.nvidia.api_key'    => null]);
         config(['ai.providers.groq.api_key'      => null]);
         config(['ai.providers.anthropic.api_key' => null]);
         config(['ai.providers.openai.api_key'    => null]);
@@ -51,6 +57,10 @@ class CopilotTest extends TestCase
 
     public function test_ai_router_calls_groq_api_with_correct_format(): void
     {
+        // Disable the higher-priority nvidia provider so groq is exercised.
+        config(['ai.providers.nvidia.api_key'    => null]);
+        config(['ai.providers.anthropic.api_key' => null]);
+        config(['ai.providers.openai.api_key'    => null]);
         config(['ai.providers.groq.api_key' => 'test-groq-key']);
         config(['ai.providers.groq.model'   => 'llama-3.3-70b-versatile']);
 
@@ -77,6 +87,9 @@ class CopilotTest extends TestCase
 
     public function test_ai_router_falls_back_to_anthropic_when_groq_fails(): void
     {
+        // Disable nvidia/openai so the chain is groq -> anthropic.
+        config(['ai.providers.nvidia.api_key'    => null]);
+        config(['ai.providers.openai.api_key'    => null]);
         config(['ai.providers.groq.api_key'      => 'test-groq-key']);
         config(['ai.providers.anthropic.api_key' => 'test-anthropic-key']);
 
@@ -98,6 +111,10 @@ class CopilotTest extends TestCase
 
     public function test_ai_router_throws_when_all_providers_fail(): void
     {
+        // Only groq configured (with a bad key); nvidia/anthropic/openai disabled.
+        config(['ai.providers.nvidia.api_key'    => null]);
+        config(['ai.providers.anthropic.api_key' => null]);
+        config(['ai.providers.openai.api_key'    => null]);
         config(['ai.providers.groq.api_key' => 'bad-key']);
         Http::fake(['api.groq.com/*' => Http::response(['error' => 'unauthorized'], 401)]);
 
@@ -181,6 +198,10 @@ class CopilotTest extends TestCase
 
     public function test_send_message_calls_ai_and_stores_response(): void
     {
+        // Disable the higher-priority nvidia provider so groq handles the request.
+        config(['ai.providers.nvidia.api_key'    => null]);
+        config(['ai.providers.anthropic.api_key' => null]);
+        config(['ai.providers.openai.api_key'    => null]);
         config(['ai.providers.groq.api_key' => 'test-key']);
         config(['ai.providers.groq.model'   => 'llama-3.3-70b-versatile']);
 
@@ -219,6 +240,7 @@ class CopilotTest extends TestCase
 
     public function test_send_message_returns_422_when_no_provider(): void
     {
+        config(['ai.providers.nvidia.api_key'    => null]);
         config(['ai.providers.groq.api_key'      => null]);
         config(['ai.providers.anthropic.api_key' => null]);
         config(['ai.providers.openai.api_key'    => null]);
@@ -275,6 +297,10 @@ class CopilotTest extends TestCase
 
     public function test_status_endpoint_shows_provider_info(): void
     {
+        // Disable the higher-priority nvidia provider so groq is the active one.
+        config(['ai.providers.nvidia.api_key'    => null]);
+        config(['ai.providers.anthropic.api_key' => null]);
+        config(['ai.providers.openai.api_key'    => null]);
         config(['ai.providers.groq.api_key' => 'test-key']);
 
         $response = $this->actingAs($this->user)

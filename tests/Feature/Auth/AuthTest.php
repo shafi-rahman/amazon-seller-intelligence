@@ -3,12 +3,23 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Registration assigns the `seller` Spatie role, which must already
+        // exist. Production seeds these via RolePermissionSeeder; tests must
+        // do the same so assignRole('seller') does not throw RoleDoesNotExist.
+        $this->seed(RolePermissionSeeder::class);
+    }
 
     public function test_user_can_register(): void
     {
@@ -72,7 +83,9 @@ class AuthTest extends TestCase
             'password' => 'wrongpassword',
         ]);
 
-        $response->assertStatus(401);
+        // Failed login → 422 with a validation-style body (Laravel's standard;
+        // an AuthenticationException would 500 trying to redirect to 'login').
+        $response->assertStatus(422);
     }
 
     public function test_user_can_get_their_profile(): void

@@ -249,7 +249,7 @@ class ReconciliationEngineTest extends TestCase
         $run = $this->createRun('2024-01-01', '2024-01-31');
 
         $response = $this->actingAs($this->user)
-            ->getJson("/api/v1/workspaces/{$this->workspace->id}/reconciliation/{$run->id}/status");
+            ->getJson("/api/v1/workspaces/{$this->workspace->id}/reconciliation/{$run->public_id}/status");
 
         $response->assertStatus(200)
             ->assertJsonPath('data.status', 'pending')
@@ -262,7 +262,7 @@ class ReconciliationEngineTest extends TestCase
         $this->engine->run($run);
 
         $response = $this->actingAs($this->user)
-            ->getJson("/api/v1/workspaces/{$this->workspace->id}/reconciliation/{$run->id}/reports/summary");
+            ->getJson("/api/v1/workspaces/{$this->workspace->id}/reconciliation/{$run->public_id}/reports/summary");
 
         $response->assertStatus(200)
             ->assertJsonStructure(['data' => ['report_type', 'data']]);
@@ -334,6 +334,7 @@ class ReconciliationEngineTest extends TestCase
             'settlement_start_date' => '2024-01-01',
             'settlement_end_date'   => '2024-01-14',
             'deposit_date'          => '2024-01-16',
+            'posted_date'           => '2024-01-16',
             'deposited_amount'      => 45000.00,
             'currency'              => 'INR',
             'transaction_type'      => $type,

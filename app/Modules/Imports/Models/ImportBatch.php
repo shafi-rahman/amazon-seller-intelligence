@@ -18,6 +18,13 @@ class ImportBatch extends Model
     /** @use HasFactory<ImportBatchFactory> */
     use HasFactory;
 
+    // Module models live outside App\Models, so the default factory-name guess
+    // misses — point it explicitly.
+    protected static function newFactory(): ImportBatchFactory
+    {
+        return ImportBatchFactory::new();
+    }
+
     protected $fillable = [
         'workspace_id', 'user_id', 'type', 'original_filename', 'storage_path',
         'file_size_bytes', 'status', 'total_rows', 'processed_rows', 'failed_rows',

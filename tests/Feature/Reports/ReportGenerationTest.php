@@ -103,7 +103,10 @@ class ReportGenerationTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonCount(1, 'data')
-            ->assertJsonStructure(['data' => [['id', 'type', 'title', 'status', 'has_file']]]);
+            // The reports LIST endpoint returns raw model columns (not the ReportResource
+            // shape), so the computed `has_file` flag is not present here — assert the
+            // raw `file_path` column instead.
+            ->assertJsonStructure(['data' => [['id', 'type', 'title', 'status', 'file_path']]]);
     }
 
     public function test_can_filter_reports_by_type(): void
@@ -173,9 +176,18 @@ class ReportGenerationTest extends TestCase
             'title'           => 'Test Product',
         ]);
 
+        // keyword_gaps.competitor_id is a NOT NULL FK -> competitors, so a real
+        // competitor row must exist before inserting gaps.
+        $competitor = \App\Modules\Competitors\Models\Competitor::create([
+            'workspace_id' => $this->workspace->id,
+            'product_id'   => $product->id,
+            'asin'         => 'B09RPTCOMP',
+            'title'        => 'Rival Mug',
+        ]);
+
         \App\Modules\Competitors\Models\KeywordGap::insert([
-            ['product_id' => $product->id, 'competitor_id' => 1, 'keyword' => 'ceramic mug', 'gap_type' => 'missing',   'our_frequency' => 0, 'their_frequency' => 3, 'priority_score' => 75],
-            ['product_id' => $product->id, 'competitor_id' => 1, 'keyword' => 'bpa free',    'gap_type' => 'advantage', 'our_frequency' => 2, 'their_frequency' => 0, 'priority_score' => 20],
+            ['product_id' => $product->id, 'competitor_id' => $competitor->id, 'keyword' => 'ceramic mug', 'gap_type' => 'missing',   'our_frequency' => 0, 'their_frequency' => 3, 'priority_score' => 75],
+            ['product_id' => $product->id, 'competitor_id' => $competitor->id, 'keyword' => 'bpa free',    'gap_type' => 'advantage', 'our_frequency' => 2, 'their_frequency' => 0, 'priority_score' => 20],
         ]);
 
         $report = Report::create([

@@ -18,6 +18,12 @@ class Workspace extends Model
     /** @use HasFactory<WorkspaceFactory> */
     use HasFactory;
 
+    // Module models live outside the App\Models namespace, so Laravel's default
+    // factory-name guess (Database\Factories\Modules\...) misses. Point it explicitly.
+    protected static function newFactory(): WorkspaceFactory
+    {
+        return WorkspaceFactory::new();
+    }
 
     protected $fillable = [
         'name',

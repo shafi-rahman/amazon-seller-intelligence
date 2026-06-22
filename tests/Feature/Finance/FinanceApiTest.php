@@ -96,8 +96,12 @@ class FinanceApiTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonPath('data.total_orders', 2)
-            ->assertJsonPath('data.total_revenue', 1798.00)
             ->assertJsonPath('data.total_tax', 323.64);
+
+        // total_revenue is a whole number (1798.00) which json_encode emits as
+        // the integer 1798; assertJsonPath uses strict comparison, so compare
+        // numerically against the decoded value instead.
+        $this->assertEqualsWithDelta(1798.00, (float) $response->json('data.total_revenue'), 0.001);
     }
 
     public function test_orders_blocks_unauthorized_workspace(): void

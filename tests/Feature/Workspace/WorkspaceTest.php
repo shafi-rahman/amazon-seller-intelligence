@@ -60,7 +60,7 @@ class WorkspaceTest extends TestCase
         $workspace = Workspace::factory()->create(['owner_id' => $user->id]);
         $workspace->members()->attach($user->id, ['role' => 'owner']);
 
-        $response = $this->actingAs($user)->getJson("/api/v1/workspaces/{$workspace->id}");
+        $response = $this->actingAs($user)->getJson("/api/v1/workspaces/{$workspace->public_id}");
 
         $response->assertStatus(200)
             ->assertJsonPath('data.id', $workspace->id);
@@ -72,7 +72,7 @@ class WorkspaceTest extends TestCase
         $other     = User::factory()->create();
         $workspace = Workspace::factory()->create(['owner_id' => $owner->id]);
 
-        $response = $this->actingAs($other)->getJson("/api/v1/workspaces/{$workspace->id}");
+        $response = $this->actingAs($other)->getJson("/api/v1/workspaces/{$workspace->public_id}");
 
         $response->assertStatus(403);
     }
@@ -83,7 +83,7 @@ class WorkspaceTest extends TestCase
         $workspace = Workspace::factory()->create(['owner_id' => $user->id]);
         $workspace->members()->attach($user->id, ['role' => 'owner']);
 
-        $response = $this->actingAs($user)->putJson("/api/v1/workspaces/{$workspace->id}", [
+        $response = $this->actingAs($user)->putJson("/api/v1/workspaces/{$workspace->public_id}", [
             'name' => 'Updated Name',
         ]);
 

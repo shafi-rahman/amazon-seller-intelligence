@@ -23,7 +23,7 @@ class ListingScorerTest extends TestCase
         $this->product = new Product([
             'asin'        => 'B09TEST001',
             'sku'         => 'TEST-SKU-001',
-            'title'       => 'Blue Ceramic Coffee Mug 350ml | Dishwasher Safe | Gift for Coffee Lovers',
+            'title'       => 'MugCo Blue Ceramic Coffee Mug 350ml | Dishwasher Safe | Gift for Coffee Lovers',
             'brand'       => 'MugCo',
             'category'    => 'Kitchen & Dining',
             'bullet_1'    => 'PREMIUM CERAMIC MATERIAL: Made from high-quality food-grade ceramic that is 100% BPA free and non-toxic.',

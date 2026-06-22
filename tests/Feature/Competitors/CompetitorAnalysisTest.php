@@ -141,9 +141,12 @@ class CompetitorAnalysisTest extends TestCase
             ['keyword' => 'coffee lover', 'source' => 'description', 'frequency' => 2],
         ];
 
+        // Competitor title must contain only the title keyword's words; "coffee"
+        // is intentionally omitted so "coffee lover" does not also pick up the
+        // title-position bonus (position is derived from the actual title text).
         $gaps = $calculator->calculate(
             $ourKeywords, $theirKeywords, $this->product->id, $this->competitor->id,
-            'Gift Box Coffee Mug', []
+            'Gift Box Mug', []
         );
 
         $gapMap = collect($gaps)->keyBy('keyword');
@@ -222,7 +225,7 @@ class CompetitorAnalysisTest extends TestCase
     public function test_can_list_competitors_for_product(): void
     {
         $response = $this->actingAs($this->user)
-            ->getJson("/api/v1/workspaces/{$this->workspace->id}/products/{$this->product->id}/competitors");
+            ->getJson("/api/v1/workspaces/{$this->workspace->id}/products/{$this->product->public_id}/competitors");
 
         $response->assertStatus(200)
             ->assertJsonCount(1, 'data')
@@ -240,7 +243,7 @@ class CompetitorAnalysisTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->user)
-            ->getJson("/api/v1/workspaces/{$this->workspace->id}/products/{$this->product->id}/keyword-gaps?gap_type=missing");
+            ->getJson("/api/v1/workspaces/{$this->workspace->id}/products/{$this->product->public_id}/keyword-gaps?gap_type=missing");
 
         $response->assertStatus(200)
             ->assertJsonCount(1, 'data')
@@ -250,7 +253,7 @@ class CompetitorAnalysisTest extends TestCase
     public function test_benchmark_endpoint_returns_product_and_competitor_data(): void
     {
         $response = $this->actingAs($this->user)
-            ->getJson("/api/v1/workspaces/{$this->workspace->id}/products/{$this->product->id}/benchmark");
+            ->getJson("/api/v1/workspaces/{$this->workspace->id}/products/{$this->product->public_id}/benchmark");
 
         $response->assertStatus(200)
             ->assertJsonStructure(['data' => ['product', 'competitors', 'consensus_gaps', 'competitor_count']]);
@@ -261,7 +264,7 @@ class CompetitorAnalysisTest extends TestCase
         Queue::fake();
 
         $response = $this->actingAs($this->user)
-            ->postJson("/api/v1/workspaces/{$this->workspace->id}/products/{$this->product->id}/competitors/{$this->competitor->id}/analyze");
+            ->postJson("/api/v1/workspaces/{$this->workspace->id}/products/{$this->product->public_id}/competitors/{$this->competitor->id}/analyze");
 
         $response->assertStatus(202);
         Queue::assertPushedOn('ai', CompetitorAnalysisJob::class);
@@ -285,7 +288,7 @@ class CompetitorAnalysisTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->user)
-            ->getJson("/api/v1/workspaces/{$this->workspace->id}/products/{$this->product->id}/competitors");
+            ->getJson("/api/v1/workspaces/{$this->workspace->id}/products/{$this->product->public_id}/competitors");
 
         $response->assertStatus(200);
         $found = collect($response->json('data'))->firstWhere('asin', 'B09HTMLCMP');

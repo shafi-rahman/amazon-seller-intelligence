@@ -51,8 +51,9 @@ class ImportUploadTest extends TestCase
             ])
             ->assertJsonPath('data.status', 'awaiting_mapping');
 
+        // import_batch_id is now the UUID public_id (HasPublicId), not the integer PK.
         Storage::disk('s3')->assertExists(
-            ImportBatch::find($response->json('data.import_batch_id'))->storage_path
+            ImportBatch::where('public_id', $response->json('data.import_batch_id'))->firstOrFail()->storage_path
         );
     }
 
@@ -97,11 +98,13 @@ class ImportUploadTest extends TestCase
             'column_mapping'  => ['amazon-order-id' => 'amazon_order_id'],
         ]);
 
-        $response = $this->actingAs($this->user)->postJson("/api/v1/imports/{$batch->id}/confirm-mapping", [
+        // URL resolves the batch by UUID public_id (HasPublicId route-model binding).
+        $response = $this->actingAs($this->user)->postJson("/api/v1/imports/{$batch->public_id}/confirm-mapping", [
             'mapping' => ['amazon-order-id' => 'amazon_order_id', 'purchase-date' => 'purchase_date'],
         ]);
 
-        $response->assertStatus(200)
+        // Confirming the mapping dispatches an async ProcessImportJob → 202 Accepted.
+        $response->assertStatus(202)
             ->assertJsonPath('data.status', 'pending');
 
         Queue::assertPushedOn('imports', \App\Modules\Imports\Jobs\ProcessImportJob::class);
@@ -120,7 +123,8 @@ class ImportUploadTest extends TestCase
             'failed_rows'     => 5,
         ]);
 
-        $response = $this->actingAs($this->user)->getJson("/api/v1/imports/{$batch->id}/status");
+        // URL resolves the batch by UUID public_id (HasPublicId route-model binding).
+        $response = $this->actingAs($this->user)->getJson("/api/v1/imports/{$batch->public_id}/status");
 
         $response->assertStatus(200)
             ->assertJsonPath('data.status', 'processing')
