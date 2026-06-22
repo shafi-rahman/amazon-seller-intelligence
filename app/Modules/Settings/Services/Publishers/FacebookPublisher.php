@@ -40,7 +40,7 @@ class FacebookPublisher
         if (!$response->ok()) {
             Log::error('Facebook publish failed', [
                 'status' => $response->status(),
-                'body'   => $response->body(),
+                'body' => substr($response->body(), 0, 500),
             ]);
             throw new \RuntimeException('Facebook API error: ' . $response->json('error.message', $response->body()));
         }

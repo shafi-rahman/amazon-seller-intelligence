@@ -61,7 +61,7 @@ class EmbeddingProviderService
         if (!$response->ok()) {
             Log::error('OpenAI embedding failed', [
                 'status' => $response->status(),
-                'body'   => $response->body(),
+                'body' => substr($response->body(), 0, 500),
             ]);
             throw new \RuntimeException('OpenAI embedding API error: '.$response->status());
         }

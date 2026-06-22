@@ -117,7 +117,9 @@ class AIRouter
             'Authorization' => "Bearer {$apiKey}",
             'Content-Type'  => 'application/json',
         ])
-            ->timeout(90)
+            ->connectTimeout(5)
+            ->timeout(30)
+            ->retry(2, 200, throw: false)
             ->post($url, [
                 'model'      => $model,
                 'messages'   => $messages,
@@ -126,9 +128,10 @@ class AIRouter
             ]);
 
         if (!$response->ok()) {
-            throw new \RuntimeException(
-                "{$providerName} API error {$response->status()}: ".$response->body()
-            );
+            // Log the upstream body for debugging, but never include it in the
+            // thrown message — it can surface to clients and may leak details.
+            Log::warning("{$providerName} API error", ['status' => $response->status(), 'body' => substr($response->body(), 0, 500)]);
+            throw new \RuntimeException("{$providerName} API error {$response->status()}");
         }
 
         $data = $response->json();
@@ -171,13 +174,14 @@ class AIRouter
             'anthropic-version' => config('ai.providers.anthropic.version', '2023-06-01'),
             'Content-Type'      => 'application/json',
         ])
-            ->timeout(90)
+            ->connectTimeout(5)
+            ->timeout(45)
+            ->retry(2, 200, throw: false)
             ->post(config('ai.providers.anthropic.api_url'), $payload);
 
         if (!$response->ok()) {
-            throw new \RuntimeException(
-                'Anthropic API error '.$response->status().': '.$response->body()
-            );
+            Log::warning('Anthropic API error', ['status' => $response->status(), 'body' => substr($response->body(), 0, 500)]);
+            throw new \RuntimeException('Anthropic API error '.$response->status());
         }
 
         $data = $response->json();
@@ -230,12 +234,15 @@ class AIRouter
             'Content-Type'  => 'application/json',
             'Accept'        => 'application/json',
         ])
-            ->timeout(180) // reasoning models take longer
+            ->connectTimeout(5)
+            ->timeout(90) // reasoning models take longer, but cap so failover stays bounded
+            ->retry(2, 200, throw: false)
             ->post($url, $payload);
 
         if (!$response->ok()) {
+            Log::warning('NVIDIA API error', ['status' => $response->status(), 'body' => substr($response->body(), 0, 500)]);
             throw new \RuntimeException(
-                'NVIDIA API error '.$response->status().': '.$response->body()
+                'NVIDIA API error '.$response->status()
             );
         }
 

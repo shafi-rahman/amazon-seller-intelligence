@@ -26,4 +26,12 @@ class GenerateReportJob implements ShouldQueue
 
         $service->generate($report);
     }
+
+    /** Mark the report failed after retries are exhausted (incl. timeout/OOM). */
+    public function failed(\Throwable $e): void
+    {
+        Report::where('id', $this->reportId)
+            ->whereNotIn('status', ['completed'])
+            ->update(['status' => 'failed']);
+    }
 }

@@ -41,4 +41,12 @@ class RunSeoAgentJob implements ShouldQueue
             throw $e;
         }
     }
+
+    /** Mark the campaign failed after retries are exhausted (incl. timeout/OOM). */
+    public function failed(\Throwable $e): void
+    {
+        SeoCampaign::where('id', $this->campaignId)
+            ->whereNotIn('status', ['awaiting_approval', 'approved'])
+            ->update(['status' => 'failed']);
+    }
 }

@@ -38,7 +38,7 @@ class GoogleBusinessPublisher
         ])->timeout(30)->post(self::BASE_URL . "/{$locationName}/localPosts", $payload);
 
         if (!$response->ok()) {
-            Log::error('Google Business publish failed', ['status' => $response->status(), 'body' => $response->body()]);
+            Log::error('Google Business publish failed', ['status' => $response->status(), 'body' => substr($response->body(), 0, 500)]);
             throw new \RuntimeException('Google Business API error: ' . $response->json('error.message', $response->body()));
         }
 

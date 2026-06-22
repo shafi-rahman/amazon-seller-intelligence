@@ -48,6 +48,18 @@ class ProcessImportJob implements ShouldQueue
         }
     }
 
+    /**
+     * Runs after retries are exhausted — including SIGTERM/OOM kills that bypass
+     * the in-handle catch — so a batch never gets stuck in 'processing'.
+     */
+    public function failed(\Throwable $e): void
+    {
+        $batch = ImportBatch::find($this->batchId);
+        if ($batch && !in_array($batch->status, ['completed', 'failed'])) {
+            $batch->markFailed(\Illuminate\Support\Str::limit($e->getMessage(), 500));
+        }
+    }
+
     private function runParser(ImportBatch $batch): void
     {
         $onProgress = function (int $ok, int $fail, int $offset) use ($batch) {

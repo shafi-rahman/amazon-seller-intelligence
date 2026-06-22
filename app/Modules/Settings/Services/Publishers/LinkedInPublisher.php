@@ -42,7 +42,7 @@ class LinkedInPublisher
         ])->timeout(30)->post(self::BASE_URL . '/ugcPosts', $payload);
 
         if (!$response->ok()) {
-            Log::error('LinkedIn publish failed', ['status' => $response->status(), 'body' => $response->body()]);
+            Log::error('LinkedIn publish failed', ['status' => $response->status(), 'body' => substr($response->body(), 0, 500)]);
             throw new \RuntimeException('LinkedIn API error: ' . $response->json('message', $response->body()));
         }
 

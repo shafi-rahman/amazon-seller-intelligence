@@ -31,4 +31,15 @@ class ReconciliationJob implements ShouldQueue
 
         $engine->run($run);
     }
+
+    /**
+     * Guaranteed to run after all retries are exhausted (incl. timeout/OOM kills),
+     * so the run never gets stuck in 'running'/'pending' and the UI stops polling.
+     */
+    public function failed(\Throwable $e): void
+    {
+        ReconciliationRun::where('id', $this->runId)
+            ->whereNotIn('status', ['completed'])
+            ->update(['status' => 'failed', 'completed_at' => now()]);
+    }
 }

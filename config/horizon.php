@@ -210,8 +210,11 @@ return [
             'maxJobs' => 0,
             'memory' => 256,
             'tries' => 2,
-            // AI/NVIDIA reasoning calls and report generation can be slow.
-            'timeout' => 300,
+            // Worker timeout MUST be >= the longest job timeout (jobs set 600) and
+            // < queue retry_after (720), so a long job (reconciliation/import/
+            // image-gen) is never SIGTERM'd mid-run nor released for a concurrent
+            // duplicate run. Invariant: job(600) <= timeout(660) < retry_after(720).
+            'timeout' => 660,
             'nice' => 0,
         ],
     ],

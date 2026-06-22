@@ -68,7 +68,13 @@ return [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            // Must exceed the worker timeout (Horizon supervisor timeout, 660) which
+            // in turn must exceed the longest job timeout (600). Invariant:
+            // job_timeout(600) < worker_timeout(660) < retry_after(720). Keeping
+            // retry_after above the worker timeout prevents a still-running long job
+            // (reconciliation/import/image-gen) from being released and run twice,
+            // which would duplicate financial rows.
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 720),
             'block_for' => null,
             'after_commit' => false,
         ],

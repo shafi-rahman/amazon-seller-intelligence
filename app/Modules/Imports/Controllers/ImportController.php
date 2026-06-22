@@ -82,6 +82,17 @@ class ImportController extends Controller
     {
         abort_unless($importBatch->workspace->hasMember($request->user()), 403);
 
+        // Staleness guard: if a batch has been 'processing' far longer than the
+        // job could possibly run (timeout 600s + margin), the worker died without
+        // the failed() hook firing (e.g. hard kill). Report it as failed so the UI
+        // stops polling forever.
+        $status = $importBatch->status;
+        if ($status === 'processing'
+            && $importBatch->started_at
+            && $importBatch->started_at->lt(now()->subSeconds(900))) {
+            $status = 'failed';
+        }
+
         $pct = $importBatch->total_rows > 0
             ? (int) round($importBatch->processed_rows / $importBatch->total_rows * 100)
             : 0;
@@ -89,7 +100,7 @@ class ImportController extends Controller
         return $this->success([
             'id'             => $importBatch->public_id,
             'type'           => $importBatch->type,
-            'status'         => $importBatch->status,
+            'status'         => $status,
             'total_rows'     => $importBatch->total_rows,
             'processed_rows' => $importBatch->processed_rows,
             'failed_rows'    => $importBatch->failed_rows,
