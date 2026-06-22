@@ -29,13 +29,16 @@ api.interceptors.response.use(
             return Promise.reject(error)
         }
 
-        // Show toast for 403, 429, 500
-        if (status === 429) {
-            // Lazy import to avoid circular deps
+        // Surface common errors as toasts (lazy import avoids a circular dep).
+        if (status === 403) {
+            import('@/stores/toast').then(({ useToastStore }) => {
+                useToastStore().error('You do not have access to that resource.')
+            })
+        } else if (status === 429) {
             import('@/stores/toast').then(({ useToastStore }) => {
                 useToastStore().warning('Rate limit reached — please wait a moment and try again.')
             })
-        } else if (status === 500) {
+        } else if (status >= 500) {
             import('@/stores/toast').then(({ useToastStore }) => {
                 useToastStore().error('Server error — please try again. If this persists, check the Horizon queue.')
             })

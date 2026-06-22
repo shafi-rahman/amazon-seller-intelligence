@@ -60,7 +60,11 @@ export const useReportsStore = defineStore('reports', () => {
     }
 
     function startPolling(workspaceId: number, reportId: number): void {
-        const timer = setInterval(() => pollStatus(workspaceId, reportId), 3000)
+        // A failed poll must clear its own timer, otherwise a transient error
+        // leaks the interval forever (and produces unhandled rejections).
+        const timer = setInterval(() => {
+            pollStatus(workspaceId, reportId).catch(() => stopPolling(reportId))
+        }, 3000)
         polling.value.set(reportId, timer)
     }
 

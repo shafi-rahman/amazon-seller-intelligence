@@ -514,7 +514,7 @@ function barColor(score: number, max: number) {
                     </div>
                     <div v-if="product.description">
                         <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Description</h3>
-                        <p class="text-sm text-gray-700 whitespace-pre-line line-clamp-6" v-html="product.description?.replace(/<[^>]*>/g, ' ')"></p>
+                        <p class="text-sm text-gray-700 whitespace-pre-line line-clamp-6">{{ product.description?.replace(/<[^>]*>/g, ' ') }}</p>
                         <p class="text-xs text-gray-400 mt-1">{{ (product.description?.length ?? 0) }} chars</p>
                     </div>
                 </div>

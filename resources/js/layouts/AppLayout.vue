@@ -50,16 +50,6 @@ async function handleLogout() {
                     Dashboard
                 </RouterLink>
 
-                <!-- SEO Agent — prominent top-level link -->
-                <RouterLink
-                    to="/seo"
-                    class="flex items-center gap-2 px-3 py-2 text-sm rounded-md font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 transition-colors"
-                    active-class="bg-purple-100 text-purple-800"
-                >
-                    <span class="text-base">🎯</span>
-                    SEO Agent
-                </RouterLink>
-
                 <RouterLink
                     to="/copilot"
                     class="flex items-center gap-2 px-3 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-100 transition-colors"
@@ -107,6 +97,14 @@ async function handleLogout() {
                     <RouterLink to="/products" class="flex items-center gap-2 px-3 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-100 transition-colors" active-class="bg-indigo-50 text-indigo-700 font-medium">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
                         Products
+                    </RouterLink>
+                </div>
+
+                <!-- SEO Agent -->
+                <div class="mt-3 pt-3 border-t border-gray-100">
+                    <RouterLink to="/seo" class="flex items-center gap-2 px-3 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-100 transition-colors" active-class="bg-indigo-50 text-indigo-700 font-medium">
+                        <span class="text-base">🎯</span>
+                        SEO Agent
                     </RouterLink>
                 </div>
 

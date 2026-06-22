@@ -32,8 +32,13 @@ onUnmounted(() => {
 })
 
 async function poll() {
-    status.value = await importStore.pollStatus(batchId)
-    if (status.value && DONE_STATUSES.includes(status.value.status)) {
+    try {
+        status.value = await importStore.pollStatus(batchId)
+        if (status.value && DONE_STATUSES.includes(status.value.status)) {
+            if (pollTimer.value) clearInterval(pollTimer.value)
+        }
+    } catch {
+        // Stop polling on error so the interval never leaks; the interceptor toasts.
         if (pollTimer.value) clearInterval(pollTimer.value)
     }
 }
