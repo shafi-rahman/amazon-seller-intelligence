@@ -24,7 +24,8 @@ class ReconciliationRunResource extends JsonResource
                     'id'          => $r->id,
                     'report_type' => $r->report_type,
                     'count'       => $r->report_data['count'] ?? $r->report_data['total_refunds'] ?? $r->report_data['total_returns'] ?? 0,
-                    'export_path' => $r->export_path,
+                    // Don't expose the internal storage key; use the presigned download route.
+                    'has_export'  => !empty($r->export_path),
                 ])
             ),
         ];

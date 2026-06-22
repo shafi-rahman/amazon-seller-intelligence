@@ -116,7 +116,8 @@ class ReconciliationController extends Controller
             'id'          => $report->id,
             'report_type' => $report->report_type,
             'data'        => $data,
-            'export_path' => $report->export_path,
+            // Internal storage key withheld; use the presigned download route.
+            'has_export'  => !empty($report->export_path),
             'created_at'  => $report->created_at?->toISOString(),
         ]);
     }

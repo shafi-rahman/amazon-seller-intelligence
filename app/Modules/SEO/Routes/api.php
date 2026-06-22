@@ -31,8 +31,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('seo/posts/{postId}/image/revert',   [SeoCampaignController::class, 'revertPostImage']);
 });
 
-// Token-secured endpoints for OpenClaw skill (no session needed)
-Route::prefix('seo')->group(function () {
+// Token-secured endpoints for OpenClaw skill (no session needed).
+// Rate-limited to blunt brute-forcing of the static webhook token.
+Route::prefix('seo')->middleware('throttle:30,1')->group(function () {
     Route::get('campaigns/{id}/product-data', [SeoCampaignController::class, 'productData']);
     Route::post('webhook/notify',             [SeoCampaignController::class, 'webhookNotify']);
 });

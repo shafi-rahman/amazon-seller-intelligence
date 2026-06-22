@@ -18,6 +18,19 @@ class SettingsController extends Controller
 
     public function __construct(private readonly SocialPublisherService $publisher) {}
 
+    /**
+     * Settings that manage secrets (API keys, webhook token) or external accounts
+     * must be restricted to the workspace OWNER — plain membership is not enough.
+     * Returns the workspace after asserting ownership.
+     */
+    private function ownerOnly(Request $request, int $workspaceId): Workspace
+    {
+        $workspace = Workspace::findOrFail($workspaceId);
+        abort_unless($workspace->owner_id === $request->user()->id, 403,
+            'Only the workspace owner can manage these settings.');
+        return $workspace;
+    }
+
     // ─── Social Accounts ──────────────────────────────────────────────────
 
     // GET /workspaces/{id}/settings/social-accounts
@@ -55,8 +68,7 @@ class SettingsController extends Controller
     // PUT /workspaces/{id}/settings/social-accounts/{platform}
     public function updateSocialAccount(Request $request, int $workspaceId, string $platform): JsonResponse
     {
-        $workspace = Workspace::findOrFail($workspaceId);
-        abort_unless($workspace->hasMember($request->user()), 403);
+        $this->ownerOnly($request, $workspaceId);
 
         $validated = $request->validate([
             'account_name'  => ['nullable', 'string', 'max:200'],
@@ -115,8 +127,7 @@ class SettingsController extends Controller
     // DELETE /workspaces/{id}/settings/social-accounts/{platform}
     public function disconnectSocialAccount(Request $request, int $workspaceId, string $platform): JsonResponse
     {
-        $workspace = Workspace::findOrFail($workspaceId);
-        abort_unless($workspace->hasMember($request->user()), 403);
+        $this->ownerOnly($request, $workspaceId);
 
         SocialAccount::where('workspace_id', $workspaceId)
             ->where('platform', $platform)
@@ -149,16 +160,18 @@ class SettingsController extends Controller
     // PUT /workspaces/{id}/settings/ai-keys
     public function updateAiKeys(Request $request, int $workspaceId): JsonResponse
     {
-        $workspace = Workspace::findOrFail($workspaceId);
-        abort_unless($workspace->hasMember($request->user()), 403);
+        $this->ownerOnly($request, $workspaceId);
 
+        // Reject any control character (esp. CR/LF) so a value can never inject a
+        // second line into .env (e.g. "x\nAPP_DEBUG=true").
+        $noControl = ['nullable', 'string', 'max:500', 'regex:/^[^\r\n]*$/'];
         $validated = $request->validate([
-            'nvidia_api_key'      => ['nullable', 'string'],
-            'nvidia_model'        => ['nullable', 'string'],
-            'groq_api_key'        => ['nullable', 'string'],
-            'groq_model'          => ['nullable', 'string'],
-            'anthropic_api_key'   => ['nullable', 'string'],
-            'openai_api_key'      => ['nullable', 'string'],
+            'nvidia_api_key'      => $noControl,
+            'nvidia_model'        => $noControl,
+            'groq_api_key'        => $noControl,
+            'groq_model'          => $noControl,
+            'anthropic_api_key'   => $noControl,
+            'openai_api_key'      => $noControl,
             'ai_default_provider' => ['nullable', Rule::in(['nvidia', 'groq', 'anthropic', 'openai'])],
         ]);
 
@@ -182,11 +195,14 @@ class SettingsController extends Controller
     // GET /workspaces/{id}/settings/notifications
     public function notifications(Request $request, int $workspaceId): JsonResponse
     {
-        $workspace = Workspace::findOrFail($workspaceId);
-        abort_unless($workspace->hasMember($request->user()), 403);
+        $this->ownerOnly($request, $workspaceId);
 
         return $this->success([
-            'seo_webhook_token' => env('SEO_WEBHOOK_TOKEN'),
+            // Never return the raw token here — it grants access to the unauthenticated
+            // SEO webhook endpoints. Show a masked value + whether it's configured.
+            // The full token is revealed once, transiently, by regenerateToken().
+            'seo_webhook_token' => $this->maskKey(env('SEO_WEBHOOK_TOKEN')),
+            'seo_webhook_configured' => !empty(env('SEO_WEBHOOK_TOKEN')),
             'app_url'           => env('APP_URL', 'http://localhost:7801'),
             'openclaw_command'  => 'cd openclaw-skill && node seo-agent.js',
         ]);
@@ -195,8 +211,7 @@ class SettingsController extends Controller
     // POST /workspaces/{id}/settings/notifications/regenerate-token
     public function regenerateToken(Request $request, int $workspaceId): JsonResponse
     {
-        $workspace = Workspace::findOrFail($workspaceId);
-        abort_unless($workspace->hasMember($request->user()), 403);
+        $this->ownerOnly($request, $workspaceId);
 
         $newToken = bin2hex(random_bytes(32));
         $this->writeEnvValues(['SEO_WEBHOOK_TOKEN' => $newToken]);
@@ -211,8 +226,10 @@ class SettingsController extends Controller
     public function publishPost(Request $request, int $postId): JsonResponse
     {
         $post      = \App\Modules\SEO\Models\SeoPost::with(['campaign'])->findOrFail($postId);
+        // Publishing uses the owner's connected social-account tokens, so restrict to owner.
         $workspace = Workspace::findOrFail($post->campaign->workspace_id);
-        abort_unless($workspace->hasMember($request->user()), 403);
+        abort_unless($workspace->owner_id === $request->user()->id, 403,
+            'Only the workspace owner can publish posts.');
         abort_unless($post->status === 'approved', 422, 'Post must be approved before publishing.');
 
         \App\Modules\SEO\Jobs\PublishSeoPostJob::dispatch($post->id)->onQueue('default');
@@ -236,12 +253,18 @@ class SettingsController extends Controller
         $content = file_get_contents($envPath);
 
         foreach ($values as $key => $value) {
-            $value   = str_contains($value, ' ') ? "\"{$value}\"" : $value;
-            $pattern = "/^{$key}=.*/m";
-            $replace = "{$key}={$value}";
+            // Defense in depth: strip any CR/LF (callers also validate) so a value
+            // can never inject extra .env lines, then always double-quote with
+            // backslash/quote escaping. preg_quote the key so it can't be a regex.
+            $value   = str_replace(["\r", "\n"], '', (string) $value);
+            $escaped = '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
+            $pattern = '/^' . preg_quote($key, '/') . '=.*/m';
+            $replace = "{$key}={$escaped}";
 
             if (preg_match($pattern, $content)) {
-                $content = preg_replace($pattern, $replace, $content);
+                // Use a callback so $ / \ sequences in the value aren't treated as
+                // preg_replace backreferences.
+                $content = preg_replace_callback($pattern, fn() => $replace, $content);
             } else {
                 $content .= "\n{$replace}";
             }

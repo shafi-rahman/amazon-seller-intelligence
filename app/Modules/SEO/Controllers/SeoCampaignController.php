@@ -287,15 +287,15 @@ class SeoCampaignController extends Controller
     // GET /seo/campaigns/{uuid}/product-data  (for OpenClaw skill)
     public function productData(Request $request, string $id): JsonResponse
     {
-        $token = $request->query('token') ?? $request->header('X-Webhook-Token');
-        abort_unless($token === config('app.seo_webhook_token'), 401);
+        // Header only — never accept the token via ?token= (it lands in access logs).
+        $this->assertWebhookToken($request->header('X-Webhook-Token'));
 
         $campaign = SeoCampaign::findByPublicId($id);
         $campaign->load('product.keywords');
         $product  = $campaign->product;
 
         return response()->json([
-            'campaign_id'   => $campaign->id,
+            'campaign_id'   => $campaign->public_id,
             'status'        => $campaign->status,
             'product' => [
                 'asin'         => $product->asin,
@@ -320,17 +320,17 @@ class SeoCampaignController extends Controller
     // POST /seo/webhook/notify  (OpenClaw calls this to push notification status)
     public function webhookNotify(Request $request): JsonResponse
     {
-        $token = $request->header('X-Webhook-Token');
-        abort_unless($token === config('app.seo_webhook_token'), 401);
+        $this->assertWebhookToken($request->header('X-Webhook-Token'));
 
         $validated = $request->validate([
-            'campaign_id' => ['required', 'integer'],
+            // UUID public_id, not the sequential integer — prevents IDOR enumeration.
+            'campaign_id' => ['required', 'uuid'],
             'event'       => ['required', 'string'],  // 'notified' | 'posted'
             'platform'    => ['nullable', 'string'],
             'post_id'     => ['nullable', 'string'],
         ]);
 
-        $campaign = SeoCampaign::findOrFail($validated['campaign_id']);
+        $campaign = SeoCampaign::findByPublicId($validated['campaign_id']);
 
         if ($validated['event'] === 'posted' && $validated['platform']) {
             $post = $campaign->posts()
@@ -345,5 +345,14 @@ class SeoCampaignController extends Controller
         }
 
         return response()->json(['received' => true]);
+    }
+
+    /** Constant-time check of the global SEO webhook token; aborts 401 if invalid. */
+    private function assertWebhookToken(?string $token): void
+    {
+        abort_unless(
+            !empty($token) && hash_equals((string) config('app.seo_webhook_token'), (string) $token),
+            401
+        );
     }
 }

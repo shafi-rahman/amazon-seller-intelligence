@@ -5,11 +5,11 @@ namespace App\Modules\Identity\Services;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Modules\Workspace\Models\Workspace;
-use Illuminate\Auth\AuthenticationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
@@ -50,7 +50,12 @@ class AuthService
     public function login(string $email, string $password): User
     {
         if (!Auth::attempt(['email' => $email, 'password' => $password])) {
-            throw new AuthenticationException('Invalid credentials.');
+            // 422 with a clean JSON body (Laravel's standard failed-login shape).
+            // AuthenticationException here would 500 — its handler tries to redirect
+            // to a non-existent 'login' route.
+            throw ValidationException::withMessages([
+                'email' => [__('auth.failed')],
+            ]);
         }
 
         $user = Auth::user();

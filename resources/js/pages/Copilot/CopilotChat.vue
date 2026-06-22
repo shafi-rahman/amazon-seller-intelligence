@@ -100,8 +100,14 @@ function toggleSources(msgId: number) {
 }
 
 function formatMarkdown(text: string): string {
-    // Basic markdown: bold, code blocks
-    return text
+    // SECURITY: escape all HTML first so AI/user content can never inject markup
+    // (prevents stored/reflected XSS via v-html), THEN apply our limited markdown.
+    const esc = String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+    return esc
         .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre class="bg-gray-900 text-gray-100 p-3 rounded text-xs my-2 overflow-x-auto"><code>$2</code></pre>')
         .replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 rounded text-xs font-mono">$1</code>')
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
