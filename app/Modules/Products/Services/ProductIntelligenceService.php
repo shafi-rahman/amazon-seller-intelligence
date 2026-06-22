@@ -37,17 +37,18 @@ class ProductIntelligenceService
             $product->description,
         );
 
-        // Persist keywords (replace previous extraction)
-        ProductKeyword::where('product_id', $product->id)->delete();
-        if (!empty($keywords)) {
-            $rows = array_map(fn($k) => [
-                'product_id' => $product->id,
-                'keyword'    => $k['keyword'],
-                'source'     => $k['source'],
-                'frequency'  => $k['frequency'],
-            ], $keywords);
-            ProductKeyword::insert($rows);
-        }
+        // Persist keywords (replace previous extraction) atomically.
+        \Illuminate\Support\Facades\DB::transaction(function () use ($product, $keywords) {
+            ProductKeyword::where('product_id', $product->id)->delete();
+            if (!empty($keywords)) {
+                ProductKeyword::insert(array_map(fn($k) => [
+                    'product_id' => $product->id,
+                    'keyword'    => $k['keyword'],
+                    'source'     => $k['source'],
+                    'frequency'  => $k['frequency'],
+                ], $keywords));
+            }
+        });
 
         // Step 2: Rule-based listing score
         $scored = $this->scorer->score($product);

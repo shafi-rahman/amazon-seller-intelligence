@@ -28,11 +28,20 @@ class ReconciliationEngine
         $run->update(['status' => 'running', 'started_at' => now()]);
 
         try {
-            $this->passA_exactOrderSettlement($run);
-            $this->passB_fuzzyRefundMatch($run);
-            $this->passCD_settlementBank($run);
-            $this->step3_gstCrossCheck($run);
-            $this->generateAllReports($run);
+            // All passes + report writes run in ONE transaction so a mid-run
+            // failure leaves no partial financial data. Clearing prior rows for
+            // this run first makes a retry (tries=2, or a re-queued job) idempotent
+            // — it can never duplicate matches/reports.
+            DB::transaction(function () use ($run) {
+                ReconciliationMatch::where('reconciliation_run_id', $run->id)->delete();
+                ReconciliationReport::where('reconciliation_run_id', $run->id)->delete();
+
+                $this->passA_exactOrderSettlement($run);
+                $this->passB_fuzzyRefundMatch($run);
+                $this->passCD_settlementBank($run);
+                $this->step3_gstCrossCheck($run);
+                $this->generateAllReports($run);
+            });
 
             $run->update(['status' => 'completed', 'completed_at' => now()]);
             ReconciliationCompleted::dispatch($run->fresh());

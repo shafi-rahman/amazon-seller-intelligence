@@ -48,9 +48,23 @@ class GstReportParser
             try {
                 $get = fn(string $col) => $this->getValue($row, $mapping, $col);
 
+                // Content hash so re-importing the same GST report won't double tax.
+                // Natural key: IRN if present, else invoice+sku+type+amount.
+                $irn = $this->nullIfEmpty($get('irn') ?? '');
+                $rowHash = sha1(implode('|', [
+                    $batch->workspace_id,
+                    $irn ?: implode('~', [
+                        trim((string) $get('invoice_number')),
+                        trim((string) $get('sku')),
+                        trim((string) $get('transaction_type')),
+                        trim((string) $get('invoice_amount')),
+                    ]),
+                ]));
+
                 $records[] = [
                     'workspace_id'    => $batch->workspace_id,
                     'import_batch_id' => $batch->id,
+                    'row_hash'        => $rowHash,
                     'transaction_type'=> $get('transaction_type'),
                     'invoice_date'    => $this->parseDate($get('invoice_date')),
                     'invoice_number'  => $get('invoice_number'),
@@ -91,7 +105,8 @@ class GstReportParser
         }
 
         if (!empty($records)) {
-            GstTransaction::insert($records);
+            // insertOrIgnore on (workspace_id, row_hash) → re-importing is idempotent.
+            GstTransaction::insertOrIgnore($records);
         }
 
         return [$ok, $fail];

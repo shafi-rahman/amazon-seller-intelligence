@@ -79,6 +79,16 @@ class BankStatementParser
                     $credit = $amount > 0 ? $amount : 0.0;
                 }
 
+                // Content hash so re-uploading the same statement won't duplicate rows.
+                $rowHash = sha1(implode('|', [
+                    $batch->workspace_id,
+                    $txnDate,
+                    number_format($debit, 2, '.', ''),
+                    number_format($credit, 2, '.', ''),
+                    trim((string) $get('reference')),
+                    trim((string) $get('description')),
+                ]));
+
                 $records[] = [
                     'workspace_id'    => $batch->workspace_id,
                     'import_batch_id' => $batch->id,
@@ -91,6 +101,7 @@ class BankStatementParser
                     'reference'       => $get('reference'),
                     'bank_name'       => $bankName,
                     'raw_row'         => json_encode($row),
+                    'row_hash'        => $rowHash,
                     'created_at'      => now()->toDateTimeString(),
                 ];
                 $ok++;
@@ -107,7 +118,9 @@ class BankStatementParser
         }
 
         if (!empty($records)) {
-            BankTransaction::insert($records);
+            // insertOrIgnore: skip rows whose (workspace_id, row_hash) already
+            // exists, so a re-uploaded statement is idempotent.
+            BankTransaction::insertOrIgnore($records);
         }
 
         return [$ok, $fail];

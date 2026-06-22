@@ -9,6 +9,7 @@ use App\Modules\Competitors\Models\KeywordGap;
 use App\Modules\Products\Models\Product;
 use App\Modules\Products\Models\ProductKeyword;
 use App\Modules\Products\Services\KeywordExtractorService;
+use Illuminate\Support\Facades\DB;
 
 class CompetitorAnalysisService
 {
@@ -33,16 +34,18 @@ class CompetitorAnalysisService
             $competitor->description,
         );
 
-        CompetitorKeyword::where('competitor_id', $competitor->id)->delete();
+        DB::transaction(function () use ($competitor, $keywords) {
+            CompetitorKeyword::where('competitor_id', $competitor->id)->delete();
 
-        if (!empty($keywords)) {
-            CompetitorKeyword::insert(array_map(fn($k) => [
-                'competitor_id' => $competitor->id,
-                'keyword'       => $k['keyword'],
-                'source'        => $k['source'],
-                'frequency'     => $k['frequency'],
-            ], $keywords));
-        }
+            if (!empty($keywords)) {
+                CompetitorKeyword::insert(array_map(fn($k) => [
+                    'competitor_id' => $competitor->id,
+                    'keyword'       => $k['keyword'],
+                    'source'        => $k['source'],
+                    'frequency'     => $k['frequency'],
+                ], $keywords));
+            }
+        });
 
         // Step 2: If linked to a product, run gap analysis and benchmark
         if ($competitor->product_id !== null) {
@@ -73,14 +76,17 @@ class CompetitorAnalysisService
             array_filter([$competitor->brand, $product->brand]),
         );
 
-        // Replace existing gaps for this pair
-        KeywordGap::where('product_id', $product->id)
-            ->where('competitor_id', $competitor->id)
-            ->delete();
+        // Replace existing gaps for this pair atomically so a failure between
+        // delete and insert can't leave the product with zero gaps.
+        DB::transaction(function () use ($product, $competitor, $gaps) {
+            KeywordGap::where('product_id', $product->id)
+                ->where('competitor_id', $competitor->id)
+                ->delete();
 
-        if (!empty($gaps)) {
-            KeywordGap::insert($gaps);
-        }
+            if (!empty($gaps)) {
+                KeywordGap::insert($gaps);
+            }
+        });
     }
 
     private function calculateBenchmark(Product $product, Competitor $competitor): void
