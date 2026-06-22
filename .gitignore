@@ -1,29 +1,61 @@
-*.log
-.DS_Store
+# ─── Secrets & environment (NEVER commit) ───────────────────────────────────
 .env
-.env.backup
-.env.production
-.phpactor.json
-.phpunit.result.cache
-/.codex
-/.cursor/
-/.idea
-/.nova
-/.phpunit.cache
-/.vscode
-/.zed
+.env.*
+!.env.example
+!.env.production.example
 /auth.json
+/storage/*.key
+*.pem
+
+# ─── Dependencies & build output ─────────────────────────────────────────────
+/vendor
 /node_modules
 /public/build
-/public/fonts-manifest.dev.json
 /public/hot
 /public/storage
-/storage/*.key
-/storage/pail
+/public/fonts-manifest.dev.json
 /bootstrap/cache
-/vendor
+# Keep committed screenshots / marketing assets referenced by the README
+!/public/images/
+
+# ─── Laravel runtime ─────────────────────────────────────────────────────────
+/storage/pail
+/database/database.sqlite
+*.sqlite
 _ide_helper.php
+_ide_helper_models.php
+.phpactor.json
+.phpstorm.meta.php
+
+# ─── Tests, coverage & caches ────────────────────────────────────────────────
+/.phpunit.cache
+.phpunit.result.cache
+/coverage
+clover.xml
+.php-cs-fixer.cache
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# ─── Editors / IDEs ──────────────────────────────────────────────────────────
+/.idea
+/.vscode
+/.zed
+/.nova
+/.cursor/
+/.codex
+/.fleet
+
+# ─── OS junk ─────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+Desktop.ini
+
+# ─── Local dev / homestead ───────────────────────────────────────────────────
 Homestead.json
 Homestead.yaml
-Thumbs.db
-/database/database.sqlite
+/.vagrant
