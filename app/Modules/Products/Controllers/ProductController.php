@@ -58,7 +58,9 @@ class ProductController extends Controller
             $query->whereNull('listing_score')->orWhere('last_analyzed_at', '<', now()->subDays(7));
         }
 
-        return $this->paginated($query->paginate((int) $request->query('per_page', 20)));
+        // Transform through ProductResource so the list exposes the same shape as
+        // detail (UUID id, score_tier, …) instead of leaking raw model columns.
+        return $this->paginatedThrough($query->paginate($this->perPage($request, 20)), ProductResource::class);
     }
 
     // GET /workspaces/{id}/products/{product}

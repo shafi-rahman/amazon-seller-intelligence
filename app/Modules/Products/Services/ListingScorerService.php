@@ -312,7 +312,10 @@ class ListingScorerService
         $score        = 0;
         $issues       = [];
         $passes       = [];
-        $hasCompetitorData = $product->competitors()->exists();
+        // Keep scoring deterministic / DB-free: only use the competitor signal if
+        // the relation was already eager-loaded by the caller (no live query).
+        $hasCompetitorData = $product->relationLoaded('competitors')
+            && $product->competitors->isNotEmpty();
 
         // +4 primary keyword density
         if ($primaryKeyword) {

@@ -38,9 +38,9 @@ class GstTransactionController extends Controller
             $query->where('ship_to_state', $state);
         }
 
-        $paginator = $query->paginate((int) $request->query('per_page', 50));
+        $paginator = $query->paginate($this->perPage($request, 50));
 
-        return $this->paginated($paginator);
+        return $this->paginatedThrough($paginator, GstTransactionResource::class);
     }
 
     public function summary(Request $request, int $workspaceId): JsonResponse

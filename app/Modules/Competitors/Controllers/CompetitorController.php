@@ -7,6 +7,7 @@ use App\Modules\Competitors\Jobs\CompetitorAnalysisJob;
 use App\Modules\Competitors\Models\Competitor;
 use App\Modules\Competitors\Models\KeywordGap;
 use App\Modules\Competitors\Resources\CompetitorDetailResource;
+use App\Modules\Competitors\Resources\CompetitorResource;
 use App\Modules\Competitors\Services\CompetitorAnalysisService;
 use App\Modules\Imports\Services\ImportService;
 use App\Modules\Products\Models\Product;
@@ -38,9 +39,9 @@ class CompetitorController extends Controller
         $competitors = Competitor::where('product_id', $product->id)
             ->where('workspace_id', $workspaceId)
             ->orderByDesc('last_analyzed_at')
-            ->paginate((int) $request->query('per_page', 50));
+            ->paginate($this->perPage($request, 50));
 
-        return $this->paginated($competitors);
+        return $this->paginatedThrough($competitors, CompetitorResource::class);
     }
 
     // GET /workspaces/{id}/products/{product}/competitors/{competitorId}
@@ -144,10 +145,17 @@ class CompetitorController extends Controller
     {
         $this->guard($request, $workspaceId, $product);
 
-        Competitor::where('workspace_id', $workspaceId)
+        $competitor = Competitor::where('workspace_id', $workspaceId)
             ->where('product_id', $product->id)
-            ->findOrFail($competitorId)
+            ->findOrFail($competitorId);
+
+        // Clean up polymorphic RAG embeddings so deleted competitors don't keep
+        // feeding stale chunks into the copilot (no FK cascade on embeddable_*).
+        \App\Modules\AI\Models\Embedding::where('embeddable_type', Competitor::class)
+            ->where('embeddable_id', $competitor->id)
             ->delete();
+
+        $competitor->delete();
 
         return $this->noContent();
     }
@@ -165,7 +173,7 @@ class CompetitorController extends Controller
             $query->where('competitor_id', $competitorId);
         }
 
-        return $this->paginated($query->paginate((int) $request->query('per_page', 50)));
+        return $this->paginated($query->paginate($this->perPage($request, 50)));
     }
 
     // GET /workspaces/{id}/products/{product}/benchmark

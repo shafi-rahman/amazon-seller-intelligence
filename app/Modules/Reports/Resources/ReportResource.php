@@ -18,7 +18,9 @@ class ReportResource extends JsonResource
             'status'       => $this->status,
             'parameters'   => $this->parameters,
             'generated_at' => $this->generated_at?->toISOString(),
-            'created_at'   => $this->created_at->toISOString(),
+            // Null-safe: Report has $timestamps=false and created_at is set by a DB
+            // default, so a freshly-created (un-refreshed) model has null here → 500.
+            'created_at'   => $this->created_at?->toISOString(),
             'has_file'     => !empty($this->file_path),
         ];
     }

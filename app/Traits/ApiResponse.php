@@ -31,6 +31,20 @@ trait ApiResponse
         ]);
     }
 
+    /**
+     * Paginate, transforming each item through a JsonResource class so list
+     * endpoints expose the SAME shape (computed fields, UUID ids, no raw columns)
+     * as their detail endpoints. $resourceClass = e.g. ProductResource::class.
+     */
+    protected function paginatedThrough(LengthAwarePaginator $paginator, string $resourceClass): JsonResponse
+    {
+        $paginator->setCollection(
+            $paginator->getCollection()->map(fn ($m) => (new $resourceClass($m))->resolve(request()))
+        );
+
+        return $this->paginated($paginator);
+    }
+
     protected function created(mixed $data): JsonResponse
     {
         return $this->success($data, 201);
