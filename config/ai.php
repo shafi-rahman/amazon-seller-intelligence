@@ -52,9 +52,9 @@ return [
     // anthropic = Claude (high quality fallback)
     'default_provider' => env('AI_DEFAULT_PROVIDER', 'nvidia'),
 
-    // Provider used for embeddings
-    'embedding_provider' => env('APP_ENV') === 'local' && empty(env('OPENAI_API_KEY'))
-        ? 'ollama'
-        : 'openai',
+    // Preferred embedding provider. EmbeddingProviderService also auto-detects at
+    // runtime (falls back to ollama when no OPENAI_API_KEY). Plain env() so the
+    // value survives `config:cache` (the previous APP_ENV ternary did not).
+    'embedding_provider' => env('AI_EMBEDDING_PROVIDER', 'openai'),
 
 ];
