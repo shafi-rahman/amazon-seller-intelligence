@@ -47,8 +47,16 @@ echo ""
 success "PostgreSQL ready"
 
 # ── PHP Dependencies ──────────────────────────────────────────
-info "Installing Composer dependencies..."
-docker compose exec -T app composer install --no-interaction --prefer-dist --optimize-autoloader
+# In production, never install dev tooling (Telescope/PHPUnit/Faker/Pint) into the
+# running container. (For real prod deploys prefer the baked image — Dockerfile.prod.)
+APP_ENV_VALUE=$(grep -E '^APP_ENV=' .env | cut -d= -f2 | tr -d '"' | tr -d ' ')
+if [ "$APP_ENV_VALUE" = "production" ]; then
+    info "Installing Composer dependencies (production: --no-dev)..."
+    docker compose exec -T app composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+else
+    info "Installing Composer dependencies..."
+    docker compose exec -T app composer install --no-interaction --prefer-dist --optimize-autoloader
+fi
 
 # ── Laravel Setup ─────────────────────────────────────────────
 info "Generating application key..."
